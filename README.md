@@ -1,47 +1,48 @@
 # POC: Insight-ECG API
 
-> [!IMPORTANT]
-> This poc is still in development
-
 [![Python](https://img.shields.io/badge/Python-3.12-blue.svg)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.110.0-009688.svg)](https://fastapi.tiangolo.com/)
 [![Docker](https://img.shields.io/badge/Docker-Enabled-2496ED.svg)](https://www.docker.com/)
 
-## Short Overview
 
-**Insight-ECG** is an AI-driven Proof of Concept (POC) designed to act as the intelligence layer for the **IF4Health** ecosystem. 
+> [!IMPORTANT]
+> POC ainda em desenvolvimento
 
-## Architecture & Tech Stack
+## Visão Geral
 
-This project follows a modular, pragmatically SOLID architecture to separate data ingestion, validation, and AI inference.
+O **Insight-ECG** é uma Prova de Conceito (POC) baseada em Inteligência Artificial projetada para atuar como a camada de inteligência do ecossistema **IF4Health**.
 
-* **Framework:** [FastAPI](https://fastapi.tiangolo.com/) (Asynchronous, high-performance web framework).
-* **Data Validation:** [Pydantic](https://docs.pydantic.dev/) (Strict FHIR schema validation).
-* **AI Integration:** Google GenAI SDK (Gemini).
-* **Infrastructure:** Docker & Docker Compose for seamless deployment.
+## Arquitetura e Tecnologias
 
-## How to Run Locally
+Este projeto adota uma arquitetura modular e pragmaticamente SOLID para separar a ingestão de dados, validação estrutural e inferência de IA.
 
-This project is fully containerized. You do not need to install Python dependencies locally to run the API.
+* **Framework:** [FastAPI](https://fastapi.tiangolo.com/) (Framework web assíncrono e de alta performance).
+* **Validação de Dados:** [Pydantic](https://docs.pydantic.dev/) (Validação estrita de *schemas* FHIR).
+* **Integração de IA:** Google GenAI SDK (Gemini).
+* **Infraestrutura:** Docker & Docker Compose para um *deploy* contínuo e sem atritos.
 
-### Prerequisites
-* [Docker Desktop](https://www.docker.com/products/docker-desktop/) installed and running.
-* WSL 2 Integration enabled (if running on Windows).
+## Como Executar Localmente
 
-### Up and Running
+Este projeto é totalmente conteinerizado. Você não precisa instalar dependências Python localmente para rodar a API.
 
-1. Clone the repository:
+### Pré-requisitos
+* [Docker Desktop](https://www.docker.com/products/docker-desktop/) instalado e em execução.
+* Integração com WSL 2 ativada (se estiver rodando no Windows).
+
+### Subindo o Ambiente
+
+1. Clone o repositório:
    ```bash
-   git clone [https://github.com/YOUR_USERNAME/poc-insight-ecg-api.git](https://github.com/YOUR_USERNAME/poc-insight-ecg-api.git)
+   git clone [https://github.com/SEU_USUARIO/poc-insight-ecg-api.git](https://github.com/SEU_USUARIO/poc-insight-ecg-api.git)
    cd poc-insight-ecg-api
 
-2. Start the application using Docker Compose:
+2. Inicie a aplicação usando o Docker Compose:
 
     ```bash
     docker compose up --build
     ```
 
-3. Access the API and Documentation:
+3. Acesse a API e a documentação:
 
 - Health Check: http://localhost:8000/health
 
