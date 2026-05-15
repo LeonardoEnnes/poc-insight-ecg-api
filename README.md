@@ -14,8 +14,6 @@ O **Insight-ECG** é uma Prova de Conceito (POC) baseada em Inteligência Artifi
 
 ## Arquitetura e Tecnologias
 
-Este projeto adota uma arquitetura modular e pragmaticamente SOLID para separar a ingestão de dados, validação estrutural e inferência de IA.
-
 * **Framework:** [FastAPI](https://fastapi.tiangolo.com/) (Framework web assíncrono e de alta performance).
 * **Validação de Dados:** [Pydantic](https://docs.pydantic.dev/) (Validação estrita de *schemas* FHIR).
 * **Integração de IA:** Google GenAI SDK (Gemini).
