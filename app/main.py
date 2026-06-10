@@ -1,10 +1,17 @@
 from fastapi import FastAPI
+from app.core.config import settings
 
-app = FastAPI(title="Insight ECG API", version="0.1.0")
+app = FastAPI(
+    title="Insight ECG API", 
+    description="API para analise semantica de ECG via IA generativa",
+    version="0.1.0",
+    )
 
 @app.get("/health")
 def health_check():
     return {
-            "status": "ok", 
-            "message": "ta rodando"
+            "status": "online", 
+            "message": "ta rodando",
+            "enviroment": settings.ENVIRONMENT,
+            "ai_provider_active": settings.AI_PROVIDER
         }
