@@ -31,7 +31,7 @@ Este projeto é totalmente conteinerizado. Você não precisa instalar dependên
 
 1. Clone o repositório:
    ```bash
-   git clone [https://github.com/SEU_USUARIO/poc-insight-ecg-api.git](https://github.com/SEU_USUARIO/poc-insight-ecg-api.git)
+   git clone [https://github.com/LeonardoEnnes/poc-insight-ecg-api.git](https://github.com/LeonardoEnnes/poc-insight-ecg-api.git)
    cd poc-insight-ecg-api
 
 2. Inicie a aplicação usando o Docker Compose:
