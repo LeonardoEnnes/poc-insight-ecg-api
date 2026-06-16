@@ -2,7 +2,6 @@ import pytest
 from app.services.ecg_service import EcgService
 from app.core.exceptions import SignalTooLongException, CorruptedSignalException, InvalidSignalValueException
 
-
 #o ideal e testar de formas diferentes, esse e apenas um exemplo de retorno, poderia no futuro testar outros tipos
 @pytest.fixture
 def base_fhir_payload():

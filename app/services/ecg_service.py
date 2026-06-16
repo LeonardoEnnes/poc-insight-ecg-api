@@ -1,4 +1,5 @@
 from app.core.exceptions import CorruptedSignalException, SignalTooLongException
+from app.infrastructure.ia.factory import AIFactory
 from app.schemas.fhir_schema import FHIRObservation
 from fastapi import HTTPException, status
 
@@ -7,10 +8,10 @@ class EcgService:
         Servico responsavel por oequestrar logica de negocio, limpa e prepara os dados para o envio as LLMs
     """
     
-    MAX_SIGNAL_POINTS = 5000 # limite seguro para n estourar a mem e os tokens (analisar o impacto e a necessidade)
+    MAX_SIGNAL_POINTS = 5000 
 
     @classmethod
-    def process_data_for_ai(cls, payload: dict) -> dict:
+    async def process_data_for_ai(cls, payload: dict) -> dict:
         """Recebe o payload bruto, valida o contrato e extrai o contexto do sinal
 
         Args:
@@ -23,12 +24,13 @@ class EcgService:
         Returns:
             dict: _description_
         """
-        observation = FHIRObservation(**payload)
         
+        observation = FHIRObservation(**payload)
         clean_data = observation.get_clean_signal()
         total = len(clean_data)
         
         
+        # tem que ver essa validações depois, talvez seja melhor criar uma classe de validação separada, ou até mesmo usar pydantic para isso, mas por enquanto vamos deixar aqui mesmo
         if total > cls.MAX_SIGNAL_POINTS:
             raise SignalTooLongException(total, cls.MAX_SIGNAL_POINTS)
         
@@ -37,10 +39,16 @@ class EcgService:
         
         signal_context = " " .join(map(str, clean_data)) # converte a lista de floats de volta para strin
         
-        return {
-            "status": "validação_concluida",
-            "dispositivo": observation.device.display,
-            "periodo_ms": observation.get_period_ms(),
-            "total_pontos": total,
-            "tamanho_string_prompt": len(signal_context)
+        ##
+        metadados = {
+            "device": observation.device.display,
+            "period_ms": observation.get_period_ms(),
+            "total_pontos": total
         }
+        
+        
+        ia_provider = AIFactory.get_provider() # pegando o provider diretamente do factory, poderia ser injetado via dependencias, mas por enquanto vou deixar assim
+        
+        laudo = await ia_provider.analisar_ecg(sinal_contexto=signal_context, metadados=metadados)
+        
+        return laudo
