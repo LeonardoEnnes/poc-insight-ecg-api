@@ -1,8 +1,10 @@
 from google import genai
 from google.genai import types
+from google.genai.errors import APIError
 from pydantic import BaseModel
 from app.infrastructure.ia.base import LLMProvider
 from app.core.prompts import get_ecg_analysis_prompt
+from app.core.exceptions import AIIntegrationException
 import json
 
 # schema de resposta para travar a resposta, previnindo alucinação
@@ -32,5 +34,9 @@ class GeminiProvider(LLMProvider):
             )
             return json.loads(response.text)
             
+        except APIError as e:
+            raise AIIntegrationException(f"Erro na API do Google: {e.message}")
+        except json.JSONDecodeError:
+            raise AIIntegrationException("A IA não retornou um JSON válido.")
         except Exception as e:
-            raise RuntimeError(f"Falha na IA: {str(e)}")
+            raise AIIntegrationException(f"Falha inesperada de comunicação: {str(e)}")

@@ -1,6 +1,7 @@
 from app.core.config import settings
 from app.infrastructure.ia.base import LLMProvider
 from app.infrastructure.ia.gemini import GeminiProvider
+from app.core.exceptions import UnsupportedAIProviderException
 
 class AIFactory:
     """
@@ -16,8 +17,10 @@ class AIFactory:
                 api_key=settings.AI_API_KEY, 
                 model_name=settings.AI_MODEL_NAME
             )
-            
-        elif provider_name == "openai": # dps ver como orquestrar isso, talvez seja melhor criar um provider separado e importar aqui
-            raise NotImplementedError("Integração com OpenAI .")
+        
+        # dps ver como orquestrar isso, talvez seja melhor criar um provider separado e importar aqui -> vai servir para trocar de provider sem quebrar o sistema
+        # se gemini falhar ele deve trocar para outra 
+        elif provider_name == "openai": # # deixei como exemplo, mas a integracao com a openai vai ser mais complexa, então por enquanto vou deixar só o gemini mesmo
+            raise UnsupportedAIProviderException(provider_name)
         else:
-            raise ValueError(f"Provedor de IA desconhecido: {provider_name}")
+            raise UnsupportedAIProviderException(provider_name)

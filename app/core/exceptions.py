@@ -19,3 +19,11 @@ class SignalTooLongException(InsightEcgBaseException):
 class InvalidSignalValueException(InsightEcgBaseException): 
     def __init__(self):
         super().__init__("O sinal contém valores inválidos ou não numéricos.")
+
+class AIIntegrationException(InsightEcgBaseException):
+    def __init__(self, message: str):
+        super().__init__(f"Erro na integração com a IA: {message}")
+
+class UnsupportedAIProviderException(InsightEcgBaseException):
+    def __init__(self, provider_name: str):
+        super().__init__(f"Provedor de IA '{provider_name}' não suportado ou não implementado.")
