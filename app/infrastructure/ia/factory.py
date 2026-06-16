@@ -12,7 +12,10 @@ class AIFactory:
         provider_name = settings.AI_PROVIDER.lower()
         
         if provider_name == "gemini":
-            return GeminiProvider(api_key=settings.AI_API_KEY)
+            return GeminiProvider(
+                api_key=settings.AI_API_KEY, 
+                model_name=settings.AI_MODEL_NAME
+            )
             
         elif provider_name == "openai": # dps ver como orquestrar isso, talvez seja melhor criar um provider separado e importar aqui
             raise NotImplementedError("Integração com OpenAI .")
