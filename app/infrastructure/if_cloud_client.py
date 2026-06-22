@@ -1,5 +1,6 @@
 import httpx
 from typing import Dict, Any
+from app.core.exceptions import IFCloudIntegrationException
 
 class IFCloudIntegrationError(Exception):
     """Exceção customizada para erros de comunicação com o IF-Cloud."""
@@ -9,7 +10,7 @@ class IFCloudClient:
     def __init__(self, base_url: str = "https://if4health.charqueadas.ifsul.edu.br/biofass"):
         self.base_url = base_url.rstrip("/")
 
-    async def get_observation(self, observation_id: str, access_token: str, minute: int ) -> Dict[str, Any]:
+    async def get_observation(self, observation_id: str, access_token: str, minute: int) -> Dict[str, Any]:
         """
         Busca o Observation no servidor FHIR do IF-Cloud.
         """
@@ -20,19 +21,18 @@ class IFCloudClient:
             "Accept": "application/json"
         }
 
-        # verify=False contorna problemas de certificado SSL no ambiente do IF
         async with httpx.AsyncClient(verify=False, timeout=15.0) as client:
             try:
                 response = await client.get(url, headers=headers)
                 
                 if response.status_code == 401:
-                    raise IFCloudIntegrationError("Falha de Autenticação: Token inválido ou expirado.")
+                    raise IFCloudIntegrationException("Token inválido ou expirado.", status_code=401)
                     
                 if response.status_code == 404:
-                    raise IFCloudIntegrationError(f"Observation ID '{observation_id}' não encontrado no IF-Cloud.")
+                    raise IFCloudIntegrationException(f"Observation ID '{observation_id}' não encontrado.", status_code=404)
 
                 response.raise_for_status()
                 return response.json()
                 
             except httpx.RequestError as exc:
-                raise IFCloudIntegrationError(f"Erro de conexão ao acessar o IF-Cloud: {exc}")
+                raise IFCloudIntegrationException(f"Servidor inacessível ou timeout: {exc}", status_code=502)

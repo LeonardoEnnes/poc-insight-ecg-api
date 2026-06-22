@@ -27,3 +27,8 @@ class AIIntegrationException(InsightEcgBaseException):
 class UnsupportedAIProviderException(InsightEcgBaseException):
     def __init__(self, provider_name: str):
         super().__init__(f"Provedor de IA '{provider_name}' não suportado ou não implementado.")
+        
+class IFCloudIntegrationException(InsightEcgBaseException):
+    def __init__(self, message: str, status_code: int = 502):
+        self.status_code = status_code
+        super().__init__(f"Falha de comunicação com IF-Cloud: {message}")

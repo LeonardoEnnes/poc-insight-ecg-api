@@ -6,7 +6,8 @@ from app.core.exceptions import (
     CorruptedSignalException, 
     InvalidSignalValueException,
     AIIntegrationException,
-    UnsupportedAIProviderException
+    UnsupportedAIProviderException,
+    IFCloudIntegrationException
 )
 
 def add_exception_handlers(app: FastAPI):
@@ -52,4 +53,11 @@ def add_exception_handlers(app: FastAPI):
         return JSONResponse(
             status_code=501,
             content={"error": "Provedor Não Suportado", "detail": exc.message},
+        )
+        
+    @app.exception_handler(IFCloudIntegrationException)
+    async def if_cloud_integration_handler(request: Request, exc: IFCloudIntegrationException):
+        return JSONResponse(
+            status_code=exc.status_code,
+            content={"error": "Erro na Integração Externa", "detail": exc.message},
         )

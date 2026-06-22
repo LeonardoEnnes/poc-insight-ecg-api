@@ -19,23 +19,18 @@ async def process_ecg_signal(payload: dict, ia_provider: LLMProvider = Depends(A
 @router.get("/process/if-cloud/{observation_id}")
 async def process_from_if_cloud(
     observation_id: str,
-    minute: int = Query(0, description="Minuto específico do ECG a ser extraído e analisado"), # padrap 0
+    minute: int = Query(0, description="Minuto específico do ECG a ser extraído e analisado"),
     credentials: HTTPAuthorizationCredentials = Depends(security),
     ia_provider: LLMProvider = Depends(AIFactory.get_provider)
 ):
     """
     Endpoint que busca o ECG data de um Observation por ID e minuto e envia o sinal para a IA.
     """
-    try:
-        token = credentials.credentials
-        client = IFCloudClient()
-        
-        fhir_payload = await client.get_observation(observation_id, token, minute=minute)
-        
-        resultado = await EcgService.process_data_for_ai(fhir_payload, ia_provider)
-        return resultado
-        
-    except IFCloudIntegrationError as e:
-        raise HTTPException(status_code=502, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Erro interno de processamento: {str(e)}")
+    token = credentials.credentials
+    
+    client = IFCloudClient()
+    fhir_payload = await client.get_observation(observation_id, token, minute=minute)
+    
+    resultado = await EcgService.process_data_for_ai(fhir_payload, ia_provider)
+    
+    return resultado
