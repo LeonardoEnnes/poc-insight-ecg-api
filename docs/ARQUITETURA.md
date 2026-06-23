@@ -4,7 +4,7 @@ Este documento detalha o raciocínio por trás do design de software da aplicaç
 
 ---
 
-## 1. O Paradigma: Arquitetura Hexagonal (Ports and Adapters)
+## 1. O Paradigma: Arquitetura Hexagonal
 
 Embora o projeto seja inspirado nos conceitos da **Clean Architecture**, a sua implementação prática assemelha-se à **Arquitetura Hexagonal**. 
 
@@ -42,8 +42,6 @@ Os modelos LLM sofrem de perda de contexto quando tem janelas massivas de inform
 
 **A Decisão Tomada:**
 Foi implementada uma trava de segurança (`MAX_SIGNAL_POINTS = 5000`), correspondendo a uma janela (aprox. 10 a 15 segundos de exame de repouso). Séries temporais de Holter ou exames massivos sofrem um *crop clínico* inicial automático. Os metadados da requisição sinalizam dinamicamente a IA que se trata de uma "análise parcial", protegendo tanto a precisão quanto a previsibilidade financeira do sistema. 
-
-**Limitação Atual e Roadmap (Targeted Slicing):** Atualmente, a POC processa a janela inicial do sinal e não suporta a parametrização de um recorte específico de tempo (ex: do minuto 33 ao 35). Para se alinhar perfeitamente com os *endpoints* da API do IF-Cloud, as próximas iterações incluirão o **Fatiamento sob Demanda**, permitindo que a nossa API aceite parâmetros de `start` e `end` para extrair e enviar à IA apenas a janela cirúrgica desejada pelo profissional de saúde.
 
 **Trabalho Futuro:** 
 Caso seja necessario viabilizar a análise de exames maiores no futuro, será necessário implementar um **Map-Reduce** auxiliado por filas assíncronas (ex: Celery/RabbitMQ). O sistema deverá segmentar o ECG em múltiplas janelas, processá-las em paralelo através da IA (Map) e, então, utilizar um *prompt* agregador para consolidar as análises num único laudo (Reduce).
