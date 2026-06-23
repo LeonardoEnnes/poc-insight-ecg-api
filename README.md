@@ -13,7 +13,7 @@
 
 ## Visão Geral
 
-O **Insight-ECG** é uma Prova de Conceito (POC) baseada em Inteligência Artificial projetada para atuar como a camada de inteligência do ecossistema **IF4Health**. na leitura de ecgs e sintetização 
+O **Insight-ECG** é uma Prova de Conceito (POC) projetada para atuar como a camada de inteligência do ecossistema **IF4Health**. na leitura de ecgs e sintetização de dados 
 
 ## Fluxo do Sistema
 
@@ -23,25 +23,6 @@ O **Insight-ECG** é uma Prova de Conceito (POC) baseada em Inteligência Artifi
 * **Validação de Dados:** [Pydantic](https://docs.pydantic.dev/) (Validação estrita de *schemas* FHIR).
 * **Integração de IA:** [Google Gen AI SDK](https://pypi.org/project/google-genai/). (No momento somente o Gemini por questão de disponibilidade da chave de API)
 * **Infraestrutura:** Docker & Docker Compose para um *deploy* contínuo e sem atritos.
-
-
-## Estrutura de pastas
-O projeto segue os princípios da **Clean Architecture**, promovendo o desacoplamento entre a regra de negócio e os serviços de infraestrutura (APIs externas, IA).
-```text
-├── app/
-│   ├── core/           # Configurações globais, exceções customizadas e prompts de IA
-│   ├── infrastructure/ # Adaptadores externos (Cliente IF-Cloud, Factory do Gemini)
-│   ├── routes/         # Endpoints de entrada HTTP (FastAPI Routers)
-│   ├── schemas/        # Contratos de validação estrita Pydantic (Ex: FHIRObservation)
-│   ├── services/       # Coração da regra de negócio (EcgService) e fatiamento clínico
-│   └── main.py         # Entrypoint da aplicação e injeção de Exception Handlers
-├── tests/              # Bateria de testes unitários e de integração
-├── .env.example        # Template seguro de variáveis de ambiente
-├── docker-compose.yml  # Orquestração do ambiente local
-├── Dockerfile          # Imagem de produção/desenvolvimento
-├── pytest.ini          # Configuração de mapeamento do ambiente de testes
-└── requirements.txt    # Dependências do projeto fixadas 
-```
 
 ## Como Executar Localmente
 
@@ -90,19 +71,37 @@ docker exec -it poc-api pytest -v
 ```
 ### Rotas disponiveis
 
+Rota 1:
+Rota de envio Manual () ->
 Exemplo de Integração: ````jsonPOST /api/v1/ecg/process````
 
-Estrutura de Saída (JSON - HTTP 200 OK):
-
-````json
-{
-  "ritmo": "Sinusal",
-  "anomalias_detectadas": false,
-  "descricao_tecnica": "Ciclo cardíaco regular com morfologia de onda P preservada. Intervalos PR e QT dentro dos limites fisiológicos normais.",
-  "risco": "BAIXO",
-  "recomendacao": "Manter monitorização clínica contínua de rotina."
-}
 ````
+
+
+Rota 2: 
+
+Rota 3:
+
+Rota 4:
+
+## Estrutura de pastas
+O projeto segue os princípios da **Clean Architecture**, promovendo o desacoplamento entre a regra de negócio e os serviços de infraestrutura (APIs externas, IA).
+```text
+├── app/
+│   ├── core/           # Configurações globais, exceções customizadas e prompts de IA
+│   ├── infrastructure/ # Adaptadores externos (Cliente IF-Cloud, Factory do Gemini)
+│   ├── routes/         # Endpoints de entrada HTTP (FastAPI Routers)
+│   ├── schemas/        # Contratos de validação estrita Pydantic (Ex: FHIRObservation)
+│   ├── services/       # Coração da regra de negócio (EcgService) e fatiamento clínico
+│   └── main.py         # Entrypoint da aplicação e injeção de Exception Handlers
+├── tests/              # Bateria de testes unitários e de integração
+├── .env.example        # Template seguro de variáveis de ambiente
+├── docker-compose.yml  # Orquestração do ambiente local
+├── Dockerfile          # Imagem de produção/desenvolvimento
+├── pytest.ini          # Configuração de mapeamento do ambiente de testes
+└── requirements.txt    # Dependências do projeto fixadas 
+```
+
 
 ## Arquitetura do Sistema
 

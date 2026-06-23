@@ -34,3 +34,5 @@ async def process_from_if_cloud(
     resultado = await EcgService.process_data_for_ai(fhir_payload, ia_provider)
     
     return resultado
+
+# fazer o restante das rotas de tempo em tempo e o completo
