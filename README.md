@@ -1,12 +1,12 @@
 # POC: Insight-ECG API
 
 [![Python](https://img.shields.io/badge/Python-3.12-blue.svg)](https://www.python.org/)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.110.0-009688.svg)](https://fastapi.tiangolo.com/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.136.3-009688.svg)](https://fastapi.tiangolo.com/)
 [![Docker](https://img.shields.io/badge/Docker-Enabled-2496ED.svg)](https://www.docker.com/)
-
+[![Tests](https://img.shields.io/badge/Tests-Passed-brightgreen.svg)](#como-rodar-os-testes)
 
 > [!IMPORTANT]
-> POC em estágio de desenvolvimento ativo e integração
+> POC finalizada
 
 ## Sumário
 - [Visão Geral](#visão-geral)
