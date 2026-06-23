@@ -69,20 +69,27 @@ Com a aplicação rodando (docker compose up) em outro terminal rode:
 ```bash
 docker exec -it poc-api pytest -v
 ```
+---
 ### Rotas disponiveis
 
-Rota 1:
-Rota de envio Manual () ->
-Exemplo de Integração: ````jsonPOST /api/v1/ecg/process````
+#### Rota 1: Processamento Manual
+- **POST** `/api/v1/ecg/process`
+- **Descrição**: Recebe um payload FHIR completo via body da requisição.
+- **Uso**: Integrações diretas que já possuem o dado em mãos.
 
-````
+#### Rota 2: Processamento por Minuto (IF-Cloud)
+- **GET** `/api/v1/ecg/process/if-cloud/{observation_id}?minute=0`
+- **Descrição**: Busca 1 minuto específico de sinal no IF-Cloud e gera o laudo.
 
+#### Rota 3: Processamento por Intervalo (Range)
+- **GET** `/api/v1/ecg/process/if-cloud/{observation_id}/range?start=0&end=5`
+- **Descrição**: Busca um intervalo de pontos (start/end) no IF-Cloud. Ideal para fatiamentos cirúrgicos.
 
-Rota 2: 
+#### Rota 4: Processamento Completo (Metadados)
+- **GET** `/api/v1/ecg/process/if-cloud/{observation_id}/full`
+- **Descrição**: Busca o recurso Observation completo. Útil para extrair metadados e o sinal total disponível.
 
-Rota 3:
-
-Rota 4:
+Consulte o [Guia de uso das rotas](/docs/INTEGRACAO_IFCLOUD.md) para conseguir usar as rotas com sucesso.
 
 ## Estrutura de pastas
 O projeto segue os princípios da **Clean Architecture**, promovendo o desacoplamento entre a regra de negócio e os serviços de infraestrutura (APIs externas, IA).

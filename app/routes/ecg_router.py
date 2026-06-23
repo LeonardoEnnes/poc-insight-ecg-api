@@ -35,4 +35,32 @@ async def process_from_if_cloud(
     
     return resultado
 
-# fazer o restante das rotas de tempo em tempo e o completo
+@router.get("/process/if-cloud/{observation_id}/range")
+async def process_from_if_cloud_range(
+    observation_id: str,
+    start: int = Query(..., description="Ponto inicial"),
+    end: int = Query(..., description="Ponto final"),
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    ia_provider: LLMProvider = Depends(AIFactory.get_provider)
+):
+    """
+    Processa um intervalo específico do sinal.
+    """
+    token = credentials.credentials
+    client = IFCloudClient()
+    fhir_payload = await client.get_observation_range(observation_id, token, start, end)
+    return await EcgService.process_data_for_ai(fhir_payload, ia_provider)
+
+@router.get("/process/if-cloud/{observation_id}/full")
+async def process_from_if_cloud_full(
+    observation_id: str,
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    ia_provider: LLMProvider = Depends(AIFactory.get_provider)
+):
+    """
+    Busca o recurso completo e processa o sinal (sujeito ao limite de pontos do EcgService).
+    """
+    token = credentials.credentials
+    client = IFCloudClient()
+    fhir_payload = await client.get_observation_resource(observation_id, token)
+    return await EcgService.process_data_for_ai(fhir_payload, ia_provider)

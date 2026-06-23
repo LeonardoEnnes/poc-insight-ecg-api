@@ -36,3 +36,33 @@ class IFCloudClient:
                 
             except httpx.RequestError as exc:
                 raise IFCloudIntegrationException(f"Servidor inacessível ou timeout: {exc}", status_code=502)
+        
+    async def get_observation_range(self, observation_id: str, access_token: str, start: int, end: int) -> Dict[str, Any]:
+        """
+        Busca o sinal de ECG em um intervalo (start/end) no IF-Cloud.
+        """
+        url = f"{self.base_url}/Observation/{observation_id}/data/{start}/{end}"
+        headers = {"Authorization": f"Bearer {access_token}", "Accept": "application/json"}
+
+        async with httpx.AsyncClient(verify=False, timeout=15.0) as client:
+            try:
+                response = await client.get(url, headers=headers)
+                response.raise_for_status()
+                return response.json()
+            except httpx.RequestError as exc:
+                raise IFCloudIntegrationException(f"Erro no range {start}-{end}: {exc}")
+
+    async def get_observation_resource(self, observation_id: str, access_token: str) -> Dict[str, Any]:
+        """
+        Busca o recurso Observation completo (metadados).
+        """
+        url = f"{self.base_url}/Observation/{observation_id}"
+        headers = {"Authorization": f"Bearer {access_token}", "Accept": "application/json"}
+
+        async with httpx.AsyncClient(verify=False, timeout=15.0) as client:
+            try:
+                response = await client.get(url, headers=headers)
+                response.raise_for_status()
+                return response.json()
+            except httpx.RequestError as exc:
+                raise IFCloudIntegrationException(f"Erro ao buscar recurso completo: {exc}")

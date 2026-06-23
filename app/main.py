@@ -16,7 +16,7 @@ add_exception_handlers(app)
 def health_check():
     return {
             "status": "online", 
-            "message": "ta rodando",
+            "message": "Api rodando",
             "enviroment": settings.ENVIRONMENT,
             "ai_provider_active": settings.AI_PROVIDER
         }
