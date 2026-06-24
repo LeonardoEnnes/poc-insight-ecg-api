@@ -8,18 +8,16 @@ class EcgService:
         Servico responsavel por oequestrar logica de negocio, limpa e prepara os dados para o envio as LLMs
     """
     
-    MAX_SIGNAL_POINTS = 5000 # Deixei 5000 setado por hora (futuramente analisar a possibilidade de aumentar)
+    # 1 minuto
+    MAX_SIGNAL_POINTS = 30000
 
     @classmethod
     async def process_data_for_ai(cls, payload: dict, ia_provider: LLMProvider) -> dict:
         """
         Recebe o payload FHIR, extrai os biossinais e prepara o contexto para a IA.
         
-        DECISÃO ARQUITETURAL (ADR - Limite de Tokens):
-        Para evitar o esgotamento da cota da API (Tokens) e prevenir a perda de contexto 
-        da IA em exames contínuos (fenômeno 'Lost in the Middle'), foi aplicado um teto rigido 
-        (MAX_SIGNAL_POINTS). Exames massivos (ex: Holter) sofrem 'crop' clínico, processando 
-        apenas a primeira janela de observação viável
+        Janela Clínica de 1 Minuto para viabilizar a detecção de padrões arrítmicos 
+        que exigem observação prolongada, mantendo a proteção contra estouro de tokens.
         """
         observation = FHIRObservation(**payload)
         clean_data = observation.get_clean_signal()

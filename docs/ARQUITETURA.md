@@ -41,7 +41,7 @@ Nessa arquitetura com FastAPI, foi decidido usar os modelos do **Pydantic** (`ap
 Os modelos LLM sofrem de perda de contexto quando tem janelas massivas de informação (fenómeno *Lost in the Middle*), e os custos de API escalam rapidamente com o uso intensivo de *tokens*. No contexto dessa POC, foi utilizado o arquivo mock "FHIR-Observation-2-lead" que continha uma série temporal massiva de dados. Se fosse realizado o envio destes dados isso causaria o esgotamento do limite de *tokens* (*Token Limit Exceeded*), ao contrário de exemplo menor que foi processado perfeitamente pela IA.
 
 **A Decisão Tomada:**
-Foi implementada uma trava de segurança (`MAX_SIGNAL_POINTS = 5000`), correspondendo a uma janela (aprox. 10 a 15 segundos de exame de repouso). Séries temporais de Holter ou exames massivos sofrem um *crop clínico* inicial automático. Os metadados da requisição sinalizam dinamicamente a IA que se trata de uma "análise parcial", protegendo tanto a precisão quanto a previsibilidade financeira do sistema. 
+Foi implementada uma trava de segurança (`MAX_SIGNAL_POINTS = 30000`), correspondendo a uma janela de **1 minuto** de exame de repouso (considerando taxas de amostragem de até 500Hz). 
 
-**Trabalho Futuro:** 
-Caso seja necessario viabilizar a análise de exames maiores no futuro, será necessário implementar um **Map-Reduce** auxiliado por filas assíncronas (ex: Celery/RabbitMQ). O sistema deverá segmentar o ECG em múltiplas janelas, processá-las em paralelo através da IA (Map) e, então, utilizar um *prompt* agregador para consolidar as análises num único laudo (Reduce).
+**Justificativa Técnica:**
+60 segundos permite que a IA analise a variabilidade da frequência cardíaca e identifique padrões morfológicos intermitentes, sem comprometer a latência ou exceder os limites de tokens do modelo atual. Atualmente para a POC manti 1 minuto mas futuramente avaliar a viabilidade de aumentar

@@ -31,7 +31,7 @@ O funcionamento do **Insight-ECG** segue um pipeline linear e resiliente, dividi
 
 1.  **Entrada (Ingestão)**: O sistema recebe um identificador de exame (`observation_id`) ou um payload JSON manual no padrão HL7 FHIR.
 2.  **Integração e Coleta**: Caso seja uma integração, o `IFCloudClient` realiza uma chamada autenticada ao servidor do IF-Cloud para extrair os biossinais brutos.
-3.  **Processamento e Fatiamento**: O `EcgService` valida a integridade do sinal via Pydantic e aplica um fatiamento clínico (*sliding window*) de até 5.000 pontos, garantindo que a IA receba uma janela de contexto precisa e otimizada.
+3. **Processamento e Fatiamento**: O `EcgService` valida a integridade do sinal via Pydantic e aplica um fatiamento clínico (*sliding window*) de até 30.000 pontos, garantindo que a IA receba uma janela de contexto de aproximadamente 1 minuto de exame, otimizando a detecção de arritmias.
 4.  **Análise por IA (Inferência)**: O sinal processado é injetado em um prompt estruturado com *guardrails* clínicos e enviado ao Google Gemini através do `GeminiProvider`.
 5.  **Saída (Entrega)**: O sistema processa a resposta da IA e entrega um laudo técnico estruturado em JSON, contendo o ritmo cardíaco, nível de risco (BAIXO, MÉDIO ou ALTO) e recomendações clínicas preliminares.
 
