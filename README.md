@@ -3,7 +3,7 @@
 [![Python](https://img.shields.io/badge/Python-3.12-blue.svg)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.136.3-009688.svg)](https://fastapi.tiangolo.com/)
 [![Docker](https://img.shields.io/badge/Docker-Enabled-2496ED.svg)](https://www.docker.com/)
-[![Tests](https://img.shields.io/badge/Tests-Passed-brightgreen.svg)](#como-rodar-os-testes)
+[![CI](https://github.com/LeonardoEnnes/poc-insight-ecg-api/actions/workflows/ci.yml/badge.svg)](https://github.com/LeonardoEnnes/poc-insight-ecg-api/actions/workflows/ci.yml)
 
 > [!IMPORTANT]
 > POC finalizada
