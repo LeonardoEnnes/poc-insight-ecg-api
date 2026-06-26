@@ -184,7 +184,11 @@ flowchart TD
     style IF_CLOUD fill:#005ce6,color:#fff
 ```
 ---
-### Documentação Aprofundada
-As decisões técnicas, padrões de projeto e justificações arquiteturais estão documentadas no diretório docs/.
 
+### Documentação Aprofundada
+As decisões técnicas, possiveis soluções, padrões de projeto e justificações arquiteturais estão documentadas no diretório docs/.
+
+Acesse por aqui:
 - [Decisões Arquiteturais](/docs/ARQUITETURA.md)
+- [Integração com o IfCloud]()
+- Caso encontre problemas consulte: [TroubleShootings - Possiveis soluções de erros](./TROUBLESHOOTING.md)
