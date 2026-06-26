@@ -191,4 +191,4 @@ As decisões técnicas, possiveis soluções, padrões de projeto e justificaç�
 Acesse por aqui:
 - [Decisões Arquiteturais](/docs/ARQUITETURA.md)
 - [Integração com o IfCloud]()
-- Caso encontre problemas consulte: [TroubleShootings - Possiveis soluções de erros](./TROUBLESHOOTING.md)
+- Caso encontre problemas consulte: [TroubleShootings - Possiveis soluções de erros](./docs/TROUBLESHOOTING.md)

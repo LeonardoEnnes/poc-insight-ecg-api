@@ -59,11 +59,12 @@ async def test_if_can_proccess_ecg(base_fhir_payload, mock_provider):
 async def test_if_can_slice_signal_above_limit(base_fhir_payload, mock_provider):
     """Garante que a trava de segurança corte o array sem estourar excao."""
     
-    base_fhir_payload["component"][0]["valueSampledData"]["data"] = "100.0 " * 6000 # simula ecg giante de 60000
+    # fatiando
+    base_fhir_payload["component"][0]["valueSampledData"]["data"] = "100.0 " * 60000
     
     result = await EcgService.process_data_for_ai(base_fhir_payload, mock_provider)
     
-    assert mock_provider.metadados_recebidos["total_pontos_analisados"] == 5000
+    assert mock_provider.metadados_recebidos["total_pontos_analisados"] == 30000
     assert "PARCIAL" in mock_provider.metadados_recebidos["tipo_analise"]
     
     # Garante que a IA processou a fatia e retornou o laudo
