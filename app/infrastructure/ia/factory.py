@@ -18,9 +18,7 @@ class AIFactory:
                 model_name=settings.AI_MODEL_NAME
             )
         
-        # dps ver como orquestrar isso, talvez seja melhor criar um provider separado e importar aqui -> vai servir para trocar de provider sem quebrar o sistema
-        # se gemini falhar ele deve trocar para outra 
-        elif provider_name == "openai": # # deixei como exemplo, mas a integracao com a openai vai ser mais complexa, então por enquanto vou deixar só o gemini mesmo
+        elif provider_name == "openai": # deixei como exemplo esse else
             raise UnsupportedAIProviderException(provider_name)
         else:
             raise UnsupportedAIProviderException(provider_name)
