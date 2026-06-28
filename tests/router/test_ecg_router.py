@@ -53,6 +53,7 @@ def override_ia_fail():
     app.dependency_overrides[AIFactory.get_provider] = lambda: MockFailIA()
     yield
     app.dependency_overrides.clear()
+    
 
 def test_if_can_process_ecg_successfully(valid_payload, override_ia_success):
     """Garante que a API devolve 200 OK quando tudo funciona."""
@@ -83,3 +84,10 @@ def test_if_can_block_invalid_fhir_schema():
     
     assert response.status_code == 422
     assert "detail" in response.json()
+    
+def test_if_routes_are_protected_by_auth():
+    """Garante que rotas do IF-Cloud exigem token (401 Unauthorized)."""
+    response = client.get("/api/v1/ecg/process/if-cloud/12345")
+    
+    assert response.status_code == 401
+    assert response.json()["detail"] == "Not authenticated"
