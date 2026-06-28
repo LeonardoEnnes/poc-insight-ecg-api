@@ -4,6 +4,7 @@
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.136.3-009688.svg)](https://fastapi.tiangolo.com/)
 [![Docker](https://img.shields.io/badge/Docker-Enabled-2496ED.svg)](https://www.docker.com/)
 [![CI](https://github.com/LeonardoEnnes/poc-insight-ecg-api/actions/workflows/ci.yml/badge.svg)](https://github.com/LeonardoEnnes/poc-insight-ecg-api/actions/workflows/ci.yml)
+![Coverage](https://img.shields.io/badge/coverage-90%25-brightgreen.svg)
 
 > [!IMPORTANT]
 > POC finalizada
@@ -87,6 +88,11 @@ Com a aplicação rodando (docker compose up) em outro terminal rode:
 ```bash
 docker exec -it poc-api pytest -v
 ```
+Caso precise rodar a cobertura de testes
+```
+docker exec -it poc-api pytest --cov=app --cov-report=html;  
+```
+
 ---
 ### Rotas disponiveis
 
