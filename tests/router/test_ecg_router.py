@@ -4,6 +4,7 @@ from app.main import app
 from app.infrastructure.ia.factory import AIFactory
 from app.infrastructure.ia.base import LLMProvider
 from app.core.exceptions import AIIntegrationException
+from unittest.mock import patch
 
 client = TestClient(app)
 
@@ -91,3 +92,19 @@ def test_if_routes_are_protected_by_auth():
     
     assert response.status_code == 401
     assert response.json()["detail"] == "Not authenticated"
+    
+
+@patch("app.infrastructure.if_cloud_client.IFCloudClient.get_observation_resource")
+def test_if_can_process_ifcloud_full_successfully(mock_get_full, override_ia_success, valid_payload):
+    """Valida o endpoint de extração completa do recurso sem parâmetros de tempo."""
+    
+    mock_get_full.return_value = valid_payload
+    
+    headers = {"Authorization": "Bearer fake_token_jwt"}
+    response = client.get("/api/v1/ecg/process/if-cloud/12345/full", headers=headers)
+    
+    assert response.status_code == 200
+    assert response.json()["risco"] == "BAIXO"
+    
+    # Garante que a rota chamou o cliente externo com os argumentos corretos
+    mock_get_full.assert_called_once_with("12345", "fake_token_jwt")

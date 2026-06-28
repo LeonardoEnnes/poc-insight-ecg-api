@@ -77,3 +77,14 @@ async def test_if_can_block_empty_signals(base_fhir_payload, mock_provider):
     
     with pytest.raises(CorruptedSignalException):
         await EcgService.process_data_for_ai(base_fhir_payload, mock_provider)
+        
+@pytest.mark.asyncio
+async def test_if_does_not_slice_signal_exactly_at_limit(base_fhir_payload, mock_provider):
+    """Garante que um sinal com exatamente 30.000 pontos seja processado como complto."""
+    
+    base_fhir_payload["component"][0]["valueSampledData"]["data"] = "100.0 " * EcgService.MAX_SIGNAL_POINTS
+    
+    result = await EcgService.process_data_for_ai(base_fhir_payload, mock_provider)
+    
+    assert mock_provider.metadados_recebidos["total_pontos_analisados"] == EcgService.MAX_SIGNAL_POINTS
+    assert mock_provider.metadados_recebidos["tipo_analise"] == "COMPLETA"
