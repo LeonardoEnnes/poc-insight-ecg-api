@@ -5,7 +5,8 @@ from app.infrastructure.ia.factory import AIFactory
 from app.infrastructure.ia.base import LLMProvider
 from app.core.exceptions import AIIntegrationException
 from app.core.signal_processor import SignalProcessor
-from app.routes.ecg_router import get_signal_processor
+from app.core.risk_classifier import RiskClassifier
+from app.routes.ecg_router import get_signal_processor, get_risk_classifier
 from unittest.mock import patch
 
 client = TestClient(app)
@@ -37,6 +38,14 @@ class MockSignalProcessor(SignalProcessor):
         }
 
 
+class MockRiskClassifier(RiskClassifier):
+    def classify(self, features: dict) -> dict:
+        return {
+            "risco_determinado": "BAIXO",
+            "justificativa_classificacao": "Mock - dentro dos parâmetros.",
+        }
+
+
 @pytest.fixture
 def valid_payload():
     return {
@@ -59,28 +68,36 @@ def valid_payload():
 
 @pytest.fixture
 def override_signal_processor():
-    """Injeta um DSP mockado."""
+    """Injeta um DSP mockado - testes de rota não devem depender do NeuroKit real."""
     app.dependency_overrides[get_signal_processor] = lambda: MockSignalProcessor()
     yield
     app.dependency_overrides.pop(get_signal_processor, None)
 
 
 @pytest.fixture
-def override_ia_success(override_signal_processor):
+def override_risk_classifier():
+    """Injeta o classificador de risco mockado."""
+    app.dependency_overrides[get_risk_classifier] = lambda: MockRiskClassifier()
+    yield
+    app.dependency_overrides.pop(get_risk_classifier, None)
+
+
+@pytest.fixture
+def override_ia_success(override_signal_processor, override_risk_classifier):
     app.dependency_overrides[AIFactory.get_provider] = lambda: MockSuccessIA()
     yield
     app.dependency_overrides.pop(AIFactory.get_provider, None)
 
 
 @pytest.fixture
-def override_ia_fail(override_signal_processor):
+def override_ia_fail(override_signal_processor, override_risk_classifier):
     app.dependency_overrides[AIFactory.get_provider] = lambda: MockFailIA()
     yield
     app.dependency_overrides.pop(AIFactory.get_provider, None)
 
 
 def test_if_can_process_ecg_successfully(valid_payload, override_ia_success):
-    """Garante que a API devolve 200 OK quando tudo funciona (DSP + IA mockados)."""
+    """Garante que a API devolve 200 OK quando tudo funciona (DSP + IA + classifier mockados)."""
     response = client.post("/api/v1/ecg/process", json=valid_payload)
 
     assert response.status_code == 200
@@ -96,7 +113,7 @@ def test_if_can_return_502_when_ia_fails(valid_payload, override_ia_fail):
     assert "Timeout" in response.json()["detail"]
 
 
-def test_if_can_block_invalid_fhir_schema():
+def test_if_can_block_invalid_fhir_schema(override_risk_classifier):
     """Garante que o Pydantic (FHIR Schema) barra lixo antes de chegar ao serviço (Erro 422)."""
     invalid_payload = {
         "resourceType": "Observation",

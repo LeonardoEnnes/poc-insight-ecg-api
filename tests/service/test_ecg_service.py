@@ -1,3 +1,4 @@
+from app.core.risk_classifier import RiskClassifier
 import pytest
 from app.services.ecg_service import EcgService
 from app.core.exceptions import CorruptedSignalException
@@ -35,10 +36,19 @@ class MockSignalProcessor(SignalProcessor):
             "qualidade_deteccao": "OK",
         }
 
-
+class MockRiskClassifier(RiskClassifier):
+    def classify(self, features: dict) -> dict:
+        return {
+            "risco_determinado": "BAIXO",
+            "justificativa_classificacao": "Mock - dentro dos parâmetros.",
+        }
 @pytest.fixture
 def mock_provider():
     return MockIAProvider()
+
+@pytest.fixture
+def mock_risk_classifier():
+    return MockRiskClassifier()
 
 
 @pytest.fixture
@@ -67,11 +77,11 @@ def base_fhir_payload():
 
 
 @pytest.mark.asyncio
-async def test_if_can_process_ecg(base_fhir_payload, mock_provider, mock_signal_processor):
+async def test_if_can_process_ecg(base_fhir_payload, mock_provider, mock_signal_processor, mock_risk_classifier):
     """Garante que um exame normal passe pelo DSP e pela IA corretamente."""
 
     result = await EcgService.process_data_for_ai(
-        base_fhir_payload, mock_provider, mock_signal_processor
+        base_fhir_payload, mock_provider, mock_signal_processor, mock_risk_classifier
     )
 
     assert result["risco"] == "BAIXO"
@@ -88,7 +98,7 @@ async def test_if_can_process_ecg(base_fhir_payload, mock_provider, mock_signal_
 
 
 @pytest.mark.asyncio
-async def test_if_applies_factor_and_origin_before_dsp(mock_provider, mock_signal_processor):
+async def test_if_applies_factor_and_origin_before_dsp(mock_provider, mock_signal_processor, mock_risk_classifier):
     """
     Garante que a conversão de unidade (factor/origin) é aplicada
     ANTES do sinal chegar no DSP - regressão do bug identificado.
@@ -110,20 +120,20 @@ async def test_if_applies_factor_and_origin_before_dsp(mock_provider, mock_signa
         }]
     }
 
-    await EcgService.process_data_for_ai(payload, mock_provider, mock_signal_processor)
+    await EcgService.process_data_for_ai(payload, mock_provider, mock_signal_processor, mock_risk_classifier)
 
     # esperado: (v * factor) + origin -> [1*2+10, 2*2+10, 3*2+10] = [12, 14, 16]
     assert mock_signal_processor.signal_recebido == [12.0, 14.0, 16.0]
 
 
 @pytest.mark.asyncio
-async def test_if_can_slice_signal_above_limit(base_fhir_payload, mock_provider, mock_signal_processor):
+async def test_if_can_slice_signal_above_limit(base_fhir_payload, mock_provider, mock_signal_processor, mock_risk_classifier):
     """Garante que a trava de segurança corte o array sem estourar exceção."""
 
     base_fhir_payload["component"][0]["valueSampledData"]["data"] = "100.0 " * 60000
 
     result = await EcgService.process_data_for_ai(
-        base_fhir_payload, mock_provider, mock_signal_processor
+        base_fhir_payload, mock_provider, mock_signal_processor, mock_risk_classifier
     )
 
     assert mock_provider.metadados_recebidos["total_pontos_analisados"] == 30000
@@ -133,21 +143,21 @@ async def test_if_can_slice_signal_above_limit(base_fhir_payload, mock_provider,
 
 
 @pytest.mark.asyncio
-async def test_if_can_block_empty_signals(base_fhir_payload, mock_provider, mock_signal_processor):
+async def test_if_can_block_empty_signals(base_fhir_payload, mock_provider, mock_signal_processor, mock_risk_classifier):
     base_fhir_payload["component"][0]["valueSampledData"]["data"] = "   "
 
     with pytest.raises(CorruptedSignalException):
-        await EcgService.process_data_for_ai(base_fhir_payload, mock_provider, mock_signal_processor)
+        await EcgService.process_data_for_ai(base_fhir_payload, mock_provider, mock_signal_processor, mock_risk_classifier)
 
 
 @pytest.mark.asyncio
-async def test_if_does_not_slice_signal_exactly_at_limit(base_fhir_payload, mock_provider, mock_signal_processor):
+async def test_if_does_not_slice_signal_exactly_at_limit(base_fhir_payload, mock_provider, mock_signal_processor, mock_risk_classifier):
     """Garante que um sinal com exatamente 30.000 pontos seja processado como completo."""
 
     base_fhir_payload["component"][0]["valueSampledData"]["data"] = "100.0 " * EcgService.MAX_SIGNAL_POINTS
 
     result = await EcgService.process_data_for_ai(
-        base_fhir_payload, mock_provider, mock_signal_processor
+        base_fhir_payload, mock_provider, mock_signal_processor, mock_risk_classifier
     )
 
     assert mock_provider.metadados_recebidos["total_pontos_analisados"] == EcgService.MAX_SIGNAL_POINTS
@@ -155,7 +165,7 @@ async def test_if_does_not_slice_signal_exactly_at_limit(base_fhir_payload, mock
 
 
 @pytest.mark.asyncio
-async def test_if_flags_insufficient_signal_quality(base_fhir_payload, mock_provider):
+async def test_if_flags_insufficient_signal_quality(base_fhir_payload, mock_provider, mock_risk_classifier):
     """
     Garante que quando o DSP não consegue detectar picos suficientes,
     o metadado de qualidade INSUFICIENTE chega até a IA (não é silenciado).
@@ -170,7 +180,7 @@ async def test_if_flags_insufficient_signal_quality(base_fhir_payload, mock_prov
             }
 
     result = await EcgService.process_data_for_ai(
-        base_fhir_payload, mock_provider, LowQualitySignalProcessor()
+        base_fhir_payload, mock_provider, LowQualitySignalProcessor(), mock_risk_classifier
     )
 
     assert mock_provider.metadados_recebidos["qualidade_deteccao"] == "INSUFICIENTE"

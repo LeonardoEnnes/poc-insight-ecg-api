@@ -13,7 +13,7 @@ class LaudoIA(BaseModel):
     ritmo: str
     anomalias_detectadas: bool
     descricao_tecnica: str
-    risco: Literal["BAIXO", "MEDIO", "ALTO"]
+    risco: Literal["BAIXO", "MEDIO", "ALTO", "INDETERMINADO"]
     recomendacao: str
 
 class GeminiProvider(LLMProvider):
