@@ -1,3 +1,4 @@
+from typing import Literal
 from google import genai
 from google.genai import types
 from google.genai.errors import APIError
@@ -12,7 +13,7 @@ class LaudoIA(BaseModel):
     ritmo: str
     anomalias_detectadas: bool
     descricao_tecnica: str
-    risco: str
+    risco: Literal["BAIXO", "MEDIO", "ALTO"]
     recomendacao: str
 
 class GeminiProvider(LLMProvider):
@@ -20,8 +21,8 @@ class GeminiProvider(LLMProvider):
         self.client = genai.Client(api_key=api_key)
         self.model_name = model_name
 
-    async def analisar_ecg(self, sinal_contexto: str, metadados: dict) -> dict:
-        prompt = get_ecg_analysis_prompt(sinal_contexto, metadados)
+    async def analisar_ecg(self, metadados: dict) -> dict:
+        prompt = get_ecg_analysis_prompt(metadados)
         
         try:
             response = await self.client.aio.models.generate_content( 

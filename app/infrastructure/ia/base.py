@@ -7,5 +7,5 @@ class LLMProvider(ABC):
     """
     
     @abstractmethod
-    async def analisar_ecg(self, sinal_contexto: str, metadados: dict) -> dict:
+    async def analisar_ecg(self, metadados: dict) -> dict:  # removido sinal_contexto
         pass
