@@ -3,6 +3,13 @@ import numpy as np
 from app.core.exceptions import CorruptedSignalException
 
 class NeuroKitSignalProcessor:
+    # Piso de plausibilidade fisiológica: nenhuma condição clínica viável
+    # produz menos que isso, mesmo bradicardia severa. Usado para rejeitar
+    # ruído/artefato que produz poucos picos espúrios (ex: eletrodo solto),
+    # distinto do limiar clínico de bradicardia do RiskClassifier (50bpm),
+    # que é uma decisão de risco, não um filtro de qualidade de sinal.
+    MIN_BPM_PLAUSIVEL = 25
+
     def extract_features(self, signal: list[float], sampling_rate: float) -> dict:
         if not signal:
             raise CorruptedSignalException()
@@ -16,9 +23,13 @@ class NeuroKitSignalProcessor:
 
         r_peaks = info["ECG_R_Peaks"]
 
-        # sinal válido tecnicamente, mas sem batimentos detectáveis (ex: flatline,
-        # eletrodo solto) - não é corrupção de dado, é achado clínico relevante
-        if len(r_peaks) < 2:
+        duration_sec = len(signal) / sampling_rate
+        min_picos_esperados = max(2, duration_sec * (self.MIN_BPM_PLAUSIVEL / 60))
+
+        # sinal válido tecnicamente, mas sem batimentos plausíveis detectáveis
+        # (ex: flatline, eletrodo solto, ruído puro) - não é corrupção de dado,
+        # é achado clínico/técnico relevante que não deve ser reportado como OK
+        if len(r_peaks) < min_picos_esperados:
             return {
                 "hr_medio_bpm": None,
                 "hrv_sdnn_ms": None,

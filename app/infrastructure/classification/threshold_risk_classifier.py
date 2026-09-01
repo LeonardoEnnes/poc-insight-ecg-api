@@ -2,8 +2,7 @@ class ThresholdRiskClassifier:
     """
     Classificador de risco por threshold determinístico.
 
-    STATUS: valor definitivo para esta fase do projeto (TCC2 - Prova de
-    Conceito). Calibrado empiricamente a partir de 16 casos observados
+    STATUS: alibrado empiricamente a partir de 16 casos observados
     (4 por categoria: Normal, APB, AFL, AFIB), com base na separação
     estatística real entre as distribuições de SDNN:
 
