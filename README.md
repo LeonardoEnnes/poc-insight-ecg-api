@@ -251,10 +251,42 @@ flowchart TD
 ```
 ---
 
+## Validação em Lote do Classificador de Risco
+ 
+O repositório inclui `scripts/validar_em_lote.py`, uma ferramenta de validação que roda a camada de DSP (`NeuroKit2`) e o `ThresholdRiskClassifier` sobre um conjunto de arquivos de ECG organizados por categoria clínica, sem envolver o LLM.
+ 
+**Para que serve**: os limiares do `ThresholdRiskClassifier` (`HR_BRADICARDIA_BPM`, `HR_TAQUICARDIA_BPM`, `HRV_SDNN_ELEVADO_MS`) são calibrados empiricamente a partir de dados reais, não de valores clínicos publicados prontos. Esse script permite recalibrar e revalidar esses limiares sempre que novos arquivos de referência forem incorporados, sem precisar rodar cada caso manualmente pelo Swagger (que exige uma chamada real e paga ao Gemini por arquivo). Como não chama LLM, é gratuito e roda em segundos mesmo para dezenas de arquivos.
+ 
+**Como usar**: organize os arquivos `.txt` de sinal bruto em subpastas por categoria clínica, dentro de uma pasta raiz:
+```
+dados_validacao/
+    normal/
+        arquivo1.txt
+        arquivo2.txt
+    apb/
+        arquivo1.txt
+    afl/
+        ...
+    afib/
+        ...
+```
+ 
+Rode:
+```bash
+docker exec -it poc-api python scripts/validar_em_lote.py tests/fixtures/ecgs_raw
+```
+ 
+O script gera:
+- `relatorio_completo.csv` — uma linha por arquivo processado, com HR, HRV, risco obtido vs. esperado e indicador de acerto.
+- Um resumo agregado no console, com média e desvio padrão de HR/HRV por categoria e a acurácia do classificador.
+> [!NOTE]
+> O mapeamento `RISCO_ESPERADO_POR_CATEGORIA` dentro do script reflete uma decisão de calibração técnica (ver `docs/DECISOES_TCC2.md`), não uma afirmação de gravidade clínica validada — ajuste-o conforme critério clínico se necessário antes de interpretar a acurácia reportada.
+
 ### Documentação Aprofundada
 As decisões técnicas, possiveis soluções, padrões de projeto e justificações arquiteturais estão documentadas no diretório docs/.
 
 Acesse por aqui:
-- [Decisões Arquiteturais](/docs/ARQUITETURA.md)
+- [Decisões Arquiteturais](/docs/DECISOES_TCC_II)
+- [Decisoes Feitar para o TCC 2](/docs/DECISOES_TCC_II)
 - [Integração com o IfCloud]()
 - Caso encontre problemas consulte: [TroubleShootings - Possiveis soluções de erros](./docs/TROUBLESHOOTING.md)

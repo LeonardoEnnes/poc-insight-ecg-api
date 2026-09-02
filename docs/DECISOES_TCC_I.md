@@ -1,3 +1,7 @@
+
+# DECISOES DO TCC I
+Aqui fica todas as decisões feitas no desenvolvimento do TCC I
+
 # Decisões Arquiteturais
 
 Este documento detalha o raciocínio por trás do design de software da aplicação. O objetivo desta arquitetura não é seguir cegamente um padrão teórico, mas sim garantir **testabilidade, resiliência e baixo acoplamento** através de uma abordagem orientada a dados.

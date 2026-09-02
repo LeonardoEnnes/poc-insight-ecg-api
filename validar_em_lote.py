@@ -1,5 +1,5 @@
 """
-Script de validação em lote - Insight-ECG TCC2
+Script de validação em lote
 
 Roda o DSP (NeuroKit2) + RiskClassifier sobre múltiplos arquivos por
 categoria clínica, gerando um relatório agregado (CSV + resumo no console)
@@ -40,10 +40,7 @@ from collections import defaultdict
 import numpy as np
 import neurokit2 as nk
 
-SAMPLING_RATE = 360.0  # confirmado no cabeçalho dos arquivos IF4Health
-
-# Mapeamento de nome de pasta -> risco esperado (ajuste conforme seu critério clínico)
-# Isto é só para fins de comparação/relatório - o classificador em si NÃO usa isso.
+SAMPLING_RATE = 360.0  # cabeçalho dos arquivos IF4Health
 RISCO_ESPERADO_POR_CATEGORIA = {
     "normal": "BAIXO",
     "apb": "MEDIO",     # ajuste se seu critério clínico definir diferente
@@ -106,7 +103,7 @@ class ThresholdRiskClassifier:
 
     HR_BRADICARDIA_BPM = 50
     HR_TAQUICARDIA_BPM = 100
-    HRV_SDNN_ELEVADO_MS = 40  # CORRIGIDO - recalibrado apos analise N=16 (era 90, defasado)
+    HRV_SDNN_ELEVADO_MS = 40
 
     def classify(self, features: dict) -> str:
         hr = features.get("hr_medio_bpm")
@@ -127,7 +124,7 @@ def main(root_dir: str):
     classifier = ThresholdRiskClassifier()
 
     linhas = []
-    agregados = defaultdict(list)  # categoria -> lista de dicts de features
+    agregados = defaultdict(list)
 
     categorias = [d for d in root.iterdir() if d.is_dir()]
     if not categorias:
