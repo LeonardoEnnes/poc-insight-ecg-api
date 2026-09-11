@@ -1,3 +1,5 @@
+import time
+
 from app.core.exceptions import CorruptedSignalException
 from app.infrastructure.ia.base import LLMProvider
 from app.schemas.fhir_schema import FHIRObservation
@@ -15,6 +17,8 @@ class EcgService:
         signal_processor: SignalProcessor,
         risk_classifier: RiskClassifier,
     ) -> dict:
+        inicio = time.perf_counter()
+
         observation = FHIRObservation(**payload)
         clean_data = observation.get_clean_signal()
         total_original = len(clean_data)
@@ -30,7 +34,6 @@ class EcgService:
         sampling_rate = 1000 / observation.get_period_ms()
         features = signal_processor.extract_features(clean_data, sampling_rate)
 
-        # decisão de risco é determinística - o LLM não decide, só narra
         classificacao = risk_classifier.classify(features)
 
         metadados = {
@@ -44,9 +47,17 @@ class EcgService:
 
         resultado_ia = await ia_provider.analisar_ecg(metadados=metadados)
 
-        # trava de segurança: o campo de risco final é SEMPRE o do classificador
-        # determinístico, nunca o que o LLM eventualmente tenha sugerido
+        # travas de segurança: os campos determinísticos sempre prevalecem
+        # sobre o que o LLM eventualmente tenha sugerido no texto gerado
         resultado_ia["risco"] = classificacao["risco_determinado"]
-        resultado_ia["padrao_sugerido"] = classificacao["padrao_sugerido"]
+        resultado_ia["padrao_sugerido"] = classificacao.get(
+            "padrao_sugerido", resultado_ia.get("padrao_sugerido")
+        )
+
+        # Tempo de processamento total do exame (DSP + classificação + IA),
+        # medido de ponta a ponta dentro do serviço. Métrica solicitada
+        # pelos avaliadores da MoCITeC (ver docs/DECISOES_TCC2.md).
+        tempo_processamento_ms = round((time.perf_counter() - inicio) * 1000, 1)
+        resultado_ia["tempo_processamento_ms"] = tempo_processamento_ms
 
         return resultado_ia
