@@ -2,39 +2,37 @@ class ThresholdRiskClassifier:
     """
     Classificador de risco por threshold determinístico.
 
-    STATUS: alibrado empiricamente a partir de 16 casos observados
-    (4 por categoria: Normal, APB, AFL, AFIB), com base na separação
+    STATUS: valor definitivo para esta fase do projeto (TCC2 - Prova de
+    Conceito). Calibrado empiricamente a partir de 52 casos observados
+    (13 por categoria: Normal, APB, AFL, AFIB), com base na separação
     estatística real entre as distribuições de SDNN:
 
-        Normal: 21.6 - 32.5 ms (N=4)
-        APB:    47.4 - 75.1 ms (N=4)
-        AFIB:   112.3 - 346.9 ms (N=4)
+        Normal: 21.6 - 38.2 ms  (N=13)
+        APB:    47.4 - 156.4 ms (N=13)
+        AFIB:   98.0 - 346.9 ms (N=13)
 
-    O limiar HRV_SDNN_ELEVADO_MS (40ms) foi fixado no ponto médio entre o
-    maior valor observado em Normal e o menor valor observado em APB,
-    validado com 100% de acurácia sobre os 16 casos disponíveis.
+    O limiar HRV_SDNN_ELEVADO_MS (40ms) separa corretamente Normal de
+    APB/AFIB (100% e 100% de acurácia respectivamente). AFL é decidido
+    primariamente pela frequência cardíaca.
 
     DECISÃO DE ESCOPO: a equivalência de severidade entre APB e AFIB
-    (ambos classificados como MEDIO neste classificador) é uma decisão
-    técnica baseada em separabilidade estatística dos dados disponíveis,
-    não uma afirmação de equivalência clínica de gravidade entre as duas
-    condições. A responsabilidade por validar, ajustar ou hierarquizar
-    clinicamente esses níveis de risco é do profissional médico - este
-    sistema atua estritamente como ferramenta de apoio à decisão, nunca
-    como fonte de diagnóstico definitivo (consistente com o escopo e as
-    limitações já declaradas no TCC1, seção 4.5).
-
-    Esta calibração é considerada fechada para o escopo do TCC2. Trabalhos
-    futuros podem revisitar os limiares com validação estatística formal
-    em maior escala (dataset anotado por especialista, tipo MIT-BIH/
-    PTB-XL) e com revisão clínica formal da hierarquia de severidade -
-    ambos registrados como extensões futuras, não como pendências
-    bloqueantes desta etapa.
+    (ambos classificados como MEDIO) é uma decisão técnica baseada em
+    separabilidade estatística, não uma afirmação de equivalência
+    clínica de gravidade. A responsabilidade por validar, ajustar ou
+    hierarquizar clinicamente esses níveis de risco é do profissional
+    médico - este sistema atua estritamente como ferramenta de apoio à
+    decisão, nunca como fonte de diagnóstico definitivo.
     """
 
     HR_BRADICARDIA_BPM = 50
     HR_TAQUICARDIA_BPM = 100
     HRV_SDNN_ELEVADO_MS = 40
+
+    # Limiar acima do qual a variabilidade é tão elevada que, nos dados
+    # observados, torna-se mais provável (ainda que não exclusiva) de
+    # fibrilação atrial do que de extrassístole isolada. NÃO é um limiar
+    # de separação limpa - ver ressalva em _sugerir_padrao().
+    HRV_SDNN_MUITO_ELEVADO_MS = 150
 
     def classify(self, features: dict) -> dict:
         hr = features.get("hr_medio_bpm")
@@ -49,6 +47,7 @@ class ThresholdRiskClassifier:
                     "de risco confiável - sinal sem picos R detectáveis "
                     "em número suficiente."
                 ),
+                "padrao_sugerido": "Não é possível sugerir padrão - qualidade de sinal insuficiente.",
             }
 
         if hr > self.HR_TAQUICARDIA_BPM or hr < self.HR_BRADICARDIA_BPM:
@@ -58,6 +57,7 @@ class ThresholdRiskClassifier:
                     f"Frequência cardíaca média ({hr} bpm) fora da faixa "
                     f"de referência [{self.HR_BRADICARDIA_BPM}-{self.HR_TAQUICARDIA_BPM}] bpm."
                 ),
+                "padrao_sugerido": self._sugerir_padrao(hr, hrv),
             }
 
         if hrv is not None and hrv > self.HRV_SDNN_ELEVADO_MS:
@@ -69,6 +69,7 @@ class ThresholdRiskClassifier:
                     f"possível irregularidade de ritmo, apesar de frequência "
                     f"cardíaca dentro da normalidade."
                 ),
+                "padrao_sugerido": self._sugerir_padrao(hr, hrv),
             }
 
         return {
@@ -77,4 +78,40 @@ class ThresholdRiskClassifier:
                 f"Frequência cardíaca ({hr} bpm) e variabilidade RR "
                 f"({hrv} ms) dentro das faixas de referência adotadas."
             ),
+            "padrao_sugerido": "Ritmo sinusal, sem padrão anômalo sugestivo identificado.",
         }
+
+    def _sugerir_padrao(self, hr: float, hrv: float | None) -> str:
+        """
+        Sugere, de forma determinística, o padrão clínico mais compatível
+        com as métricas observadas - NUNCA um diagnóstico definitivo.
+
+        RESSALVA METODOLÓGICA IMPORTANTE: análise da distribuição real de
+        SDNN em N=52 mostrou sobreposição significativa entre APB e AFIB
+        (2/13 casos de APB acima de 100ms; 7/13 casos de AFIB abaixo de
+        150ms) - portanto, distinguir essas duas condições apenas por um
+        segundo limiar de SDNN criaria falsa precisão não sustentada pelos
+        dados. Nos casos de sobreposição, o sistema nomeia ambas as
+        possibilidades, em vez de escolher uma arbitrariamente.
+        """
+        if hr > self.HR_TAQUICARDIA_BPM:
+            return (
+                "Padrão sugestivo de flutter atrial ou taquicardia sustentada "
+                "(frequência cardíaca elevada)."
+            )
+        if hr < self.HR_BRADICARDIA_BPM:
+            return "Padrão sugestivo de bradicardia significativa."
+
+        if hrv is not None and hrv > self.HRV_SDNN_MUITO_ELEVADO_MS:
+            return (
+                "Padrão mais compatível com fibrilação atrial (variabilidade "
+                "RR acentuadamente elevada), sem excluir extrassístole atrial."
+            )
+        if hrv is not None and hrv > self.HRV_SDNN_ELEVADO_MS:
+            return (
+                "Padrão compatível com extrassístole atrial ou fibrilação "
+                "atrial (variabilidade RR elevada) - distinção entre as duas "
+                "não é sustentada apenas pelas métricas de frequência e "
+                "variabilidade disponíveis nesta análise."
+            )
+        return "Sem padrão anômalo sugestivo identificado."

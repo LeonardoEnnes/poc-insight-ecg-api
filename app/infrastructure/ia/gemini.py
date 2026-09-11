@@ -16,6 +16,7 @@ class LaudoIA(BaseModel):
     ritmo: str
     anomalias_detectadas: bool
     descricao_tecnica: str
+    padrao_sugerido: str
     risco: Literal["BAIXO", "MEDIO", "ALTO", "INDETERMINADO"]
     recomendacao: str
 
@@ -29,22 +30,9 @@ class GeminiProvider(LLMProvider):
         prompt = get_ecg_analysis_prompt(metadados)
 
         try:
-            response = await self.client.aio.models.generate_content(
-                model=self.model_name,
-                contents=prompt,
-                config=types.GenerateContentConfig(
-                    response_mime_type="application/json",
-                    response_schema=LaudoIA,
-                    response_logprobs=True,
-                    logprobs=1,
-                ),
-            )
+            response = await self._gerar_com_fallback_logprobs(prompt)
             laudo = json.loads(response.text)
 
-            # Confiança via logprobs (segunda camada, complementar à
-            # confiança derivada do sinal/DSP) - best-effort: nem todo
-            # modelo/versão do Gemini suporta essa funcionalidade, então
-            # a ausência não deve derrubar a resposta principal.
             confianca_llm = self._extrair_confianca_media(response)
             if confianca_llm is not None:
                 laudo["confianca_llm"] = confianca_llm
@@ -58,6 +46,42 @@ class GeminiProvider(LLMProvider):
         except Exception as e:
             raise AIIntegrationException(f"Falha inesperada de comunicação: {str(e)}")
 
+    async def _gerar_com_fallback_logprobs(self, prompt: str):
+        """
+        Tenta gerar a resposta com logprobs habilitado (para a camada extra
+        de confiança). Se o modelo configurado não suportar essa
+        funcionalidade (ex: "Logprobs is not enabled for this model"),
+        refaz a chamada sem logprobs - a funcionalidade opcional NUNCA deve
+        derrubar a geração do laudo principal.
+        """
+        try:
+            return await self.client.aio.models.generate_content(
+                model=self.model_name,
+                contents=prompt,
+                config=types.GenerateContentConfig(
+                    response_mime_type="application/json",
+                    response_schema=LaudoIA,
+                    response_logprobs=True,
+                    logprobs=1,
+                ),
+            )
+        except APIError as e:
+            if "logprobs" in str(e.message).lower():
+                logger.warning(
+                    f"Modelo '{self.model_name}' não suporta logprobs "
+                    f"('{e.message}') - refazendo chamada sem essa opção. "
+                    f"Campo 'confianca_llm' não estará disponível nesta resposta."
+                )
+                return await self.client.aio.models.generate_content(
+                    model=self.model_name,
+                    contents=prompt,
+                    config=types.GenerateContentConfig(
+                        response_mime_type="application/json",
+                        response_schema=LaudoIA,
+                    ),
+                )
+            raise
+
     def _extrair_confianca_media(self, response) -> Optional[float]:
         """
         Extrai a probabilidade média (em escala 0-1) dos tokens gerados,
@@ -70,7 +94,8 @@ class GeminiProvider(LLMProvider):
         mais intuitiva (0 a 1).
 
         Retorna None silenciosamente se o modelo/versão não suportar
-        logprobs - não deve derrubar a resposta principal por causa disso.
+        logprobs, ou se a chamada foi refeita sem essa opção - não deve
+        derrubar a resposta principal por causa disso.
         """
         try:
             import math

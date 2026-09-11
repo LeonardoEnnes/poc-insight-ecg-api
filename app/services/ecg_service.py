@@ -27,7 +27,7 @@ class EcgService:
             clean_data = clean_data[:cls.MAX_SIGNAL_POINTS]
             tipo_analise = f"PARCIAL (Trecho inicial de {cls.MAX_SIGNAL_POINTS} pontos. Total original: {total_original})"
 
-        sampling_rate = 1000 / observation.get_period_ms()  # period em ms -> Hz
+        sampling_rate = 1000 / observation.get_period_ms()
         features = signal_processor.extract_features(clean_data, sampling_rate)
 
         # decisão de risco é determinística - o LLM não decide, só narra
@@ -47,5 +47,6 @@ class EcgService:
         # trava de segurança: o campo de risco final é SEMPRE o do classificador
         # determinístico, nunca o que o LLM eventualmente tenha sugerido
         resultado_ia["risco"] = classificacao["risco_determinado"]
+        resultado_ia["padrao_sugerido"] = classificacao["padrao_sugerido"]
 
         return resultado_ia

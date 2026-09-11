@@ -43,6 +43,7 @@ class MockRiskClassifier(RiskClassifier):
         return {
             "risco_determinado": "BAIXO",
             "justificativa_classificacao": "Mock - dentro dos parâmetros.",
+            "padrao_sugerido": "Mock - sem padrão anômalo identificado.",
         }
 
 
