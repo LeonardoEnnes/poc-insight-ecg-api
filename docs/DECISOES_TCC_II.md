@@ -107,5 +107,14 @@ Registrado como extensão em andamento: implementação de um segundo `LLMProvid
 - Hierarquização clínica formal de severidade entre condições (particularmente APB vs. AFIB) depende de revisão por profissional médico.
 - Refinamento do classificador de risco para capturar apresentações mistas de frequência e variabilidade (achado da seção 5) é candidato a evolução futura (ex: classificador multivariado).
 - Validação com conjunto de dados totalmente independente do conjunto de calibração ainda não foi realizada em escala.
-- Confiança via logprobs implementada mas inativa na plataforma atual (ver seção 11) — candidata a reativação caso o projeto migre para Vertex AI ou adote um provedor com suporte nativo (ex: OpenAI).
-- Tempo de processamento por exame ainda não foi medido e reportado — item pendente e de baixo custo de implementação.
+- ✅ Confiança via logprobs — inativa no Gemini (limitação de plataforma, seção 11), porém **ativa e funcional na OpenAI** (seção 14), confirmando que a limitação era de plataforma, não de conceito.
+- ✅ Tempo de processamento por exame — implementado (seção 15).
+- Comparação sistemática entre provedores (N=52, não apenas N=1) ainda não realizada — necessária antes de qualquer conclusão sobre qual provedor é mais confiável em escala.
+
+## 14. Comparação entre provedores (Gemini vs. OpenAI) — primeira rodada
+
+Registrado em detalhe em `Comparativo_Gemini_OpenAI_AFIB.md`. Resumo: com o mesmo estímulo (sinal AFIB, HR=85,3bpm, SDNN=98,0ms), ambos os provedores produziram laudos fiéis às métricas do DSP, consistentes internamente, e obedientes aos guardrails de risco e padrão sugerido. Diferencial funcional observado: a OpenAI retornou o campo `confianca_llm` (0,7094) com sucesso, habilitado pelo suporte nativo a logprobs desta API — ausente no Gemini por limitação de plataforma (seção 11). Uma inconsistência interna (`anomalias_detectadas: false` simultâneo a `ritmo: "Irregular"`) foi observada pontualmente na OpenAI em rodada anterior com estímulo diferente, não reproduzida nesta comparação de mesmo estímulo — candidata a investigação com N maior antes de conclusão sobre robustez comparativa entre provedores.
+
+## 15. Medição de tempo de processamento
+
+Adicionada instrumentação de tempo total de processamento (`time.perf_counter()`) no `EcgService`, cobrindo do início da validação/conversão do sinal até o retorno do laudo da IA (DSP + classificação de risco + chamada ao LLM). Resultado exposto no campo `tempo_processamento_ms` da resposta. Item solicitado explicitamente por ambos os avaliadores da MoCITeC, pendente desde a rodada de validação quantitativa inicial (seção 5).
