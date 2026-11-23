@@ -12,3 +12,4 @@ neurokit2==0.2.10
 slowapi==0.1.9
 deepeval==4.2.0
 openai==1.54.0
+wfdb==5.0.0
