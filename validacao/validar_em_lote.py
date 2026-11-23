@@ -40,12 +40,12 @@ from collections import defaultdict
 import numpy as np
 import neurokit2 as nk
 
-SAMPLING_RATE = 360.0  # cabeçalho dos arquivos IF4Health
+SAMPLING_RATE = 360.0
 RISCO_ESPERADO_POR_CATEGORIA = {
     "normal": "BAIXO",
-    "apb": "MEDIO",     # ajuste se seu critério clínico definir diferente
+    "apb": "MEDIO",
     "afl": "ALTO",
-    "afib": "MEDIO",    # ajuste se seu critério clínico definir diferente
+    "afib": "MEDIO",
 }
 
 
@@ -103,7 +103,7 @@ class ThresholdRiskClassifier:
 
     HR_BRADICARDIA_BPM = 50
     HR_TAQUICARDIA_BPM = 100
-    HRV_SDNN_ELEVADO_MS = 40
+    HRV_SDNN_ELEVADO_MS = 55
 
     def classify(self, features: dict) -> str:
         hr = features.get("hr_medio_bpm")

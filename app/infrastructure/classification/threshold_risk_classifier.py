@@ -2,31 +2,30 @@ class ThresholdRiskClassifier:
     """
     Classificador de risco por threshold determinístico.
 
-    STATUS: valor definitivo para esta fase do projeto (TCC2 - Prova de
-    Conceito). Calibrado empiricamente a partir de 52 casos observados
-    (13 por categoria: Normal, APB, AFL, AFIB), com base na separação
-    estatística real entre as distribuições de SDNN:
+    HISTÓRICO DE CALIBRAÇÃO DO LIMIAR DE SDNN (HRV_SDNN_ELEVADO_MS):
+      - 90 ms: definido com 1 exame por padrão (IF4Health, N=4).
+      - 40 ms: recalibrado com N=16 (IF4Health); 90% de acurácia em N=52,
+        mas 66,2% na validação externa (PTB-XL, fold 10, N=80) - o limiar
+        estava ajustado à faixa estreita dos normais do IF4Health
+        (21,6-38,2 ms).
+      - 55 ms (ATUAL): escolhido por F1 macro nos folds 1-8 do PTB-XL
+        (346 exames, ver validacao/calibrar_ptbxl.py). Resultados com
+        limiar congelado: PTB-XL fold 10 (N=80, não usado na escolha)
+        72,5%; IF4Health (N=52, não usado na escolha) 86,5%.
 
-        Normal: 21.6 - 38.2 ms  (N=13)
-        APB:    47.4 - 156.4 ms (N=13)
-        AFIB:   98.0 - 346.9 ms (N=13)
-
-    O limiar HRV_SDNN_ELEVADO_MS (40ms) separa corretamente Normal de
-    APB/AFIB (100% e 100% de acurácia respectivamente). AFL é decidido
-    primariamente pela frequência cardíaca.
+    Os limites de frequência (50/100 bpm) são convenções clínicas e não
+    foram ajustados aos dados.
 
     DECISÃO DE ESCOPO: a equivalência de severidade entre APB e AFIB
-    (ambos classificados como MEDIO) é uma decisão técnica baseada em
-    separabilidade estatística, não uma afirmação de equivalência
-    clínica de gravidade. A responsabilidade por validar, ajustar ou
-    hierarquizar clinicamente esses níveis de risco é do profissional
-    médico - este sistema atua estritamente como ferramenta de apoio à
-    decisão, nunca como fonte de diagnóstico definitivo.
+    (ambos MEDIO) é técnica (separabilidade das métricas), não uma
+    afirmação de gravidade clínica. A hierarquização clínica é
+    responsabilidade do profissional médico - este sistema é apoio à
+    decisão, nunca diagnóstico definitivo.
     """
 
     HR_BRADICARDIA_BPM = 50
     HR_TAQUICARDIA_BPM = 100
-    HRV_SDNN_ELEVADO_MS = 40
+    HRV_SDNN_ELEVADO_MS = 55
 
     # Limiar acima do qual a variabilidade é tão elevada que, nos dados
     # observados, torna-se mais provável (ainda que não exclusiva) de
