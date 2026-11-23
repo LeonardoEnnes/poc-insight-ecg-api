@@ -10,6 +10,7 @@ diferentes (500 Hz, derivação II).
 USO (dentro do container, a partir da raiz do projeto):
     docker exec -it poc-api pip install wfdb
     docker exec -it poc-api python validar_ptbxl.py --n 25
+    docker exec -it poc-api python validar_ptbxl.py --n 25 --folds 9 10
 
 Na primeira execução, o script baixa do PhysioNet apenas os metadados e
 os registros sorteados (alguns MB), guardando tudo em .cache_ptbxl/.
@@ -32,6 +33,7 @@ import numpy as np
 import pandas as pd
 import wfdb
 
+# funciona tanto na raiz do projeto quanto em scripts/
 _aqui = Path(__file__).resolve().parent
 for _p in (_aqui, _aqui.parent):
     if (_p / "app").is_dir():
@@ -55,11 +57,27 @@ CODIGOS_ARRITMIA = {"PAC", "AFLT", "AFIB"}
 
 
 def baixar(caminho_relativo: str) -> Path:
+    """Baixa um arquivo do PhysioNet para o cache, com novas tentativas em
+    caso de falha temporária (502/503/429) e gravação atômica."""
+    import time
+    import urllib.error
+
     destino = CACHE / caminho_relativo
-    if not destino.exists():
-        destino.parent.mkdir(parents=True, exist_ok=True)
-        urllib.request.urlretrieve(BASE_URL + caminho_relativo, destino)
-    return destino
+    if destino.exists():
+        return destino
+    destino.parent.mkdir(parents=True, exist_ok=True)
+    tmp = destino.with_suffix(destino.suffix + ".part")
+    for tentativa in range(1, 7):
+        try:
+            urllib.request.urlretrieve(BASE_URL + caminho_relativo, tmp)
+            tmp.replace(destino)
+            time.sleep(0.2)
+            return destino
+        except (urllib.error.HTTPError, urllib.error.URLError, TimeoutError) as e:
+            espera = 5 * tentativa
+            print(f"    [rede] {e} - nova tentativa em {espera}s ({tentativa}/6)")
+            time.sleep(espera)
+    raise RuntimeError(f"Falha ao baixar {caminho_relativo}. Rode de novo: o cache é mantido.")
 
 
 def categoria(scp: dict) -> str | None:
@@ -81,18 +99,18 @@ def categoria(scp: dict) -> str | None:
     return None
 
 
-def selecionar(n_por_classe: int, semente: int) -> pd.DataFrame:
+def selecionar(n_por_classe: int, semente: int, folds: list[int]) -> pd.DataFrame:
     meta = pd.read_csv(baixar("ptbxl_database.csv"), index_col="ecg_id")
     meta["scp"] = meta["scp_codes"].apply(ast.literal_eval)
     meta["categoria"] = meta["scp"].apply(categoria)
-    # fold 10: conjunto de teste recomendado pelos autores, rótulos revisados
-    meta = meta[(meta["strat_fold"] == 10) & meta["categoria"].notna()]
+    # folds 9 e 10: rótulos revisados por humanos (10 = teste recomendado pelos autores)
+    meta = meta[meta["strat_fold"].isin(folds) & meta["categoria"].notna()]
     amostras = []
     for cat in RISCO_ESPERADO:
         grupo = meta[meta["categoria"] == cat]
         k = min(n_por_classe, len(grupo))
         if k < n_por_classe:
-            print(f"[AVISO] {cat}: só {k} exames disponíveis no fold 10")
+            print(f"[AVISO] {cat}: só {k} exames disponíveis nos folds {folds}")
         amostras.append(grupo.sample(n=k, random_state=semente))
     return pd.concat(amostras)
 
@@ -129,10 +147,13 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--n", type=int, default=25, help="exames por padrão")
     ap.add_argument("--semente", type=int, default=42)
+    ap.add_argument("--folds", type=int, nargs="+", default=[10],
+                    help="folds do PTB-XL (ex.: --folds 9 10)")
     args = ap.parse_args()
 
     dsp, clf = NeuroKitSignalProcessor(), ThresholdRiskClassifier()
-    selecao = selecionar(args.n, args.semente)
+    selecao = selecionar(args.n, args.semente, args.folds)
+    print(f"Folds utilizados: {args.folds}")
     print(f"{len(selecao)} exames selecionados. Processando...")
 
     linhas = []
@@ -158,7 +179,8 @@ def main() -> None:
             "acerto": "SIM" if risco == esperado else "NAO",
         })
 
-    with open("relatorio_ptbxl.csv", "w", newline="", encoding="utf-8") as f:
+    saida = "relatorio_ptbxl.csv" if args.folds == [10] else f"relatorio_ptbxl_fold{'_'.join(map(str, args.folds))}.csv"
+    with open(saida, "w", newline="", encoding="utf-8") as f:
         w = csv.DictWriter(f, fieldnames=linhas[0].keys())
         w.writeheader()
         w.writerows(linhas)
@@ -183,7 +205,7 @@ def main() -> None:
     print(f"\nAcurácia geral: {total}/{len(linhas)} ({100*total/len(linhas):.1f}%)")
     print("Riscos obtidos:", dict(Counter(l["risco_obtido"] for l in linhas)))
     metricas_por_risco(linhas)
-    print("\nRelatório completo: relatorio_ptbxl.csv")
+    print(f"\nRelatório completo: {saida}")
 
 
 if __name__ == "__main__":
