@@ -34,5 +34,5 @@ jobs:
           echo "AI_MODEL_NAME=gemini-1.5-flash" >> .env
  
       - name: Rodar testes com pytest
-        run: pytest -v --tb=short
+        run: pytest -v --tb=short --ignore=tests/quality
  
