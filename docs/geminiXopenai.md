@@ -2,6 +2,11 @@
 
 > Complementa `docs/DECISOES_TCC2.md` (seção 12 — Segundo provedor de LLM). Primeira comparação válida "mesmo estímulo, dois provedores", após correção de confusão inicial de arquivos entre testes.
 
+> [!NOTE]
+> Registro produzido com o limiar de SDNN de **40 ms**, vigente na época do teste. A versão final usa 55 ms (ver `DECISOES_TCC_II.md`, seção 16); para este exame, o risco e o padrão sugerido seriam os mesmos.
+
+> O texto do Gemini descreve o limiar como "limiar de referência clínico", qualificação ausente das informações fornecidas (ver `DECISOES_TCC_II.md`, seção 18).
+
 ## Contexto
 
 Ambos os provedores foram testados com o **mesmo payload exato** — sinal real da categoria AFIB do conjunto de referência do IF4Health, `device.display` genérico (sem vazamento de rótulo), métricas do DSP idênticas em ambos os testes (confirmando que o mesmo sinal de entrada foi usado):

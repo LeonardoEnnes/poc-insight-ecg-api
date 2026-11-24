@@ -2,6 +2,9 @@
 
 > Documento de registro pontual, para incorporação futura ao texto do TCC2 (seção de Resultados ou Apêndice de evidências). Complementa `docs/DECISOES_TCC2.md` (seção 10 — Decisão: Nomeação de padrão clínico sugerido).
 
+> [!NOTE]
+> Registro produzido com o limiar de SDNN de **40 ms**, vigente na época do teste. A versão final usa 55 ms (ver `DECISOES_TCC_II.md`, seção 16); para este exame, o risco e o padrão sugerido seriam os mesmos.
+
 ## Contexto do teste
 
 Este registro documenta o primeiro teste de integração completo (ponta a ponta, via API real do Gemini) da funcionalidade de nomeação determinística de padrão clínico, implementada como extensão do `RiskClassifier`. O objetivo do teste foi confirmar que:

@@ -1,102 +1,63 @@
 # Integração IF-Cloud — Insight-ECG
 
-Este documento detalha o fluxo completo de integração entre o motor de Inteligência Artificial do **Insight-ECG** e o barramento de serviços FHIR do ecossistema **IF4Health**.
+Este documento descreve como usar as rotas do Insight-ECG que buscam exames no IF-Cloud, o servidor FHIR do ecossistema **IF4Health**.
 
 ---
 
-## 1. Autenticação e Controle de Acesso
+## 1. Autenticação
 
-o IF-Cloud implementa tokens JWT transmitidos via cabeçalho HTTP `Authorization: Bearer`. 
+O IF-Cloud usa tokens JWT enviados no cabeçalho `Authorization: Bearer`. O Insight-ECG apenas repassa o token do usuário; ele não armazena credenciais.
 
-### Fluxo de Obtenção de Token:
-1. Acesse o painel administrativo do Biofass [(`/dashboard`)](https://if4health.charqueadas.ifsul.edu.br/biofass/dashboard).
-2. Efetue a autenticação utilizando credenciais com privilégios de saúde de nível Profissional de Saúde.
-3. No Swagger vá em `/auth/token`, execute a chamada de troca para capturar o parâmetro `access_token` gerado para a sessão.
+### Como obter o token
+1. Acesse o painel do Biofass: [`/dashboard`](https://if4health.charqueadas.ifsul.edu.br/biofass/dashboard).
+2. Autentique-se com um usuário com perfil de Profissional de Saúde.
+3. No Swagger do Biofass, execute `/auth/token` e copie o valor de `access_token`.
+
+> [!CAUTION]
+> Nunca registre um token real neste repositório, em exemplos ou em *issues*. Use sempre um marcador como `SEU_TOKEN_AQUI`.
 
 ---
 
-## 2. Injeção de Dados Mock
-A fim de testar a conexão com essa aplicação, Vamos injetar dados ficticios dentro do sistema. 
+## 2. Cadastrar um exame de teste no IF-Cloud
 
-Importante: Os dados desse mock serão dados como inconclusivos propositalmente, pois a quantidade de dados é pequena, Caso queira dados completos use o segundo exemplo
+Para testar a integração, cadastre um recurso `Observation` com um sinal real. Os payloads em `tests/fixtures/payloads/` (um por padrão: `normal`, `apb`, `afl`, `afib`) já estão no formato aceito, com 3.600 amostras a 360 Hz (`period` de 2,7778 ms):
 
-### insira algum dos seguintes comandos:
-#### Exemplo 1:
 ```bash
-curl -X 'POST' \
-  '[https://if4health.charqueadas.ifsul.edu.br/biofass/Observation](https://if4health.charqueadas.ifsul.edu.br/biofass/Observation)' \
+curl -X POST 'https://if4health.charqueadas.ifsul.edu.br/biofass/Observation' \
   -H 'accept: application/json' \
   -H 'Content-Type: application/json' \
-  -H 'Authorization: Bearer aquivai-o-token' \
-  -k \
-  -d '{
-  "resourceType": "Observation",
-  "status": "final",
-  "device": {
-    "display": "Teste do ecg"
-  },
-  "component": [
-    {
-      "valueSampledData": {
-        "origin": { "value": 0 },
-        "period": 20000.0, 
-        "factor": 1.0,
-        "lowerLimit": -1000,
-        "upperLimit": 1000,
-        "dimensions": 1,
-        "data": "10.0 10.0 10.0 50.0 50.0 50.0 90.0 90.0 90.0"
-      }
-    }
-  ]
-}'
+  -H 'Authorization: Bearer SEU_TOKEN_AQUI' \
+  -d @tests/fixtures/payloads/normal/payload_01_ecg.json
 ```
-Explicacao: Ao configurar a propriedade `period` (taxa de amostragem) para um valor artificialmente alto (`20000.0 ms`), instruímos o motor do IF-Cloud a estender a linha do tempo do exame com poucos pontos, forçando a criação interna de múltiplos blocos lógicos indexados em base zero (`_0`, `_1`, `_2`).
 
-Resultado Esperado: Retorno 200 OK contendo os metadados estruturados FHIR e o identificador persistido no banco de dados do servidor (campo id ou _id). **Salve o hash**
+A resposta traz o identificador do recurso criado (campo `id` ou `_id`). **Guarde esse valor**: ele é o `observation_id` usado nas rotas.
 
-#### Exemplo 2:
-```bash
+> [!NOTE]
+> Sinais com poucos pontos ou com `period` artificial (por exemplo, 20.000 ms) não representam um ECG real. O Insight-ECG rejeita sinais curtos demais com erro 422 (sinal corrompido) e marca como `INDETERMINADO` os sinais em que não detecta batimentos suficientes. Nesses casos, o laudo informa que a análise não é confiável, em vez de interpretar o traçado.
 
-curl -X 'POST' \
-  'https://if4health.charqueadas.ifsul.edu.br/biofass/Observation' \
-  -H 'accept: application/json' \
-  -H 'Content-Type: application/json' \
-  -H 'Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJjbGllbnRfaWQiOiJuZW9mYXNzIiwic2NvcGUiOiJ1c2VyLyouY3J1ZHNoIiwic3ViIjoiNjhkZDgyOWI4ZjBhMWJkZDM0ODA4OWQzIiwiZmhpclVzZXIiOiJodHRwczovL2lmNGhlYWx0aC5jaGFycXVlYWRhcy5pZnN1bC5lZHUuYnIvYmlvZmFzcy8vUHJhY3RpdGlvbmVyLzY4ZGQ4MjliOGYwYTFiZGQzNDgwODlkMyIsImlhdCI6MTc4MzU1MjI1NCwiZXhwIjoxNzgzNTU1ODU0fQ.qOHVr7807XEK4WzFZTXFV0FuV468tRQo1D9lQL394Aw9Zw4IGbQ3bsFN8DNR9kH82_XARUDevLlcHJwL86uaQSaN-edVqg78CfGBaC2SbibQ6RLb8JCDZ0TEKxJTE7Ga2Xw1pDKQv6jcn6VNh37ggnmdohj4-Dvcd7SAzCtpz8zffbh-ufq9If8KF53HiqvWymXiWgWaMpJQ3qN5PXXJjf88ocNQ2WEGyUE-SWSO-5vJ99CgWFOyvkLv9kNtVxtFwaP6HHyIXZgq_Z2h6tsbpK3sD8r0hiv6k08ItR37PIL2JPkA4W8jOYU9_27IXnSgM83WeCp_6Paofx9b-c8fjw' \
-  -k \
-  -d '{
-  "resourceType": "Observation",
-  "status": "final",
-  "device": {
-    "display": "Teste do ecg 2"
-  },
-  "component": [
-    {
-      "valueSampledData": {
-        "origin": { "value": 0 },
-        "period": 20000.0,
-        "factor": 1.0,
-        "lowerLimit": -1000,
-        "upperLimit": 1000,
-        "dimensions": 1,
-        "data": "950.0 1200.0 1450.0 1300.0 900.0 650.0 500.0 750.0 1100.0 1400.0 1480.0 1250.0 850.0 600.0 550.0 800.0 1150.0 1450.0 1500.0 1200.0 800.0 550.0 600.0 850.0 1200.0 1480.0 1450.0 1150.0 750.0 500.0 650.0 900.0 1250.0 1500.0 1400.0 1050.0 700.0 550.0 700.0 1000.0 1350.0 1480.0 1300.0 950.0 600.0 500.0 750.0 1100.0 1450.0 1500.0 1250.0 850.0 550.0 600.0 850.0 1200.0 1450.0 1400.0 1100.0 700.0 500.0 650.0 950.0 1300.0 1480.0 1350.0 1000.0 650.0 550.0 750.0 1150.0 1450.0 1500.0 1250.0 800.0 500.0 600.0 850.0 1250.0 1480.0 1400.0 1050.0 700.0 550.0 700.0 1000.0 1350.0 1500.0 1300.0 900.0 600.0 500.0 750.0 1100.0 1450.0 1480.0 1200.0 800.0 550.0 600.0 850.0 1200.0 1450.0 1400.0 1100.0 750.0 500.0 650.0 950.0 1300.0 1500.0 1350.0 950.0 650.0 550.0 750.0 1150.0 1480.0 1450.0 1200.0 850.0 500.0 600.0 900.0 1250.0 1500.0 1400.0 1050.0 700.0 550.0"
-      }
-    }
-  ]
-}'
+---
 
-```
-> Se não quiser injetar os dados acima, pode injetar dados reais ou utilizar os json contidos na pasta mocks
+## 3. Testar pelas rotas do Insight-ECG
 
-### 3. Matriz de Validação e Testes Locais:
-Após subir a stack de contêineres locais via Docker (docker compose up -d --build), a aplicação exporta a rota ```GET /api/v1/ecg/process/if-cloud/{observation_id}```. Esta rota intercepta o ID e o minuto solicitados, consome o dado bruto do IF-Cloud, valida os contratos via Pydantic e processa o laudo via IA.
+Com a aplicação rodando (`docker compose up --build`):
 
-- Acesse o ambiente de documentação interativa em http://localhost:8000/docs para validar o comportamento do fatiamento:
-- Clique no botão global Authorize (ícone de cadeado no topo da página) e cole o token obtido no Passo 1.
-- Expanda a rota de integração e forneça o identificador gerado na injeção da massa de dados.
+1. Acesse http://localhost:8000/docs.
+2. Clique em **Authorize** (cadeado no topo) e cole o token obtido no passo 1.
+3. Use uma das rotas com o `observation_id` cadastrado:
 
-Altere sequencialmente o parâmetro de query minute para validar as respostas:
-| Parâmetro `minute` | Valores Extraídos do Banco | Diagnóstico do Laudo Gerado pela IA |
-| :--- | :--- | :--- |
-| `0` | `"10.0 10.0 10.0"` | Análise baseada na amplitude estagnada em 10.0. |
-| `1` | `"50.0 50.0 50.0"` | Análise baseada na amplitude estagnada em 50.0. |
-| `2` | `"90.0 90.0 90.0"` | Suspeita de assistolia ou falha técnica (lead-off) em 90.0. |
+| Rota | Parâmetros | O que é analisado |
+|---|---|---|
+| `GET /api/v1/ecg/process/if-cloud/{observation_id}` | `minute` (padrão 0) | O minuto indicado do exame |
+| `GET /api/v1/ecg/process/if-cloud/{observation_id}/range` | `start`, `end` | O intervalo de pontos indicado |
+| `GET /api/v1/ecg/process/if-cloud/{observation_id}/full` | — | O exame inteiro, sujeito ao fatiamento clínico de 30.000 pontos |
+
+Todas as rotas entregam o recurso obtido ao mesmo `EcgService` usado pela rota `POST /api/v1/ecg/process`, então o processamento (DSP, classificação de risco, redação do laudo e trava determinística) é idêntico.
+
+### Respostas de erro esperadas
+
+| Situação | Código |
+|---|---|
+| Token inválido ou expirado | 401 |
+| `observation_id` não encontrado no IF-Cloud | 404 |
+| Recurso fora do contrato FHIR ou sinal corrompido/curto demais | 422 |
+| IF-Cloud inacessível ou falha no provedor de LLM | 502 |

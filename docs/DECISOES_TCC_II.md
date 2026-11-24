@@ -1,6 +1,6 @@
 # Decisões Arquiteturais e Achados — TCC2
 
-> Este documento registra as decisões técnicas, correções e achados empíricos da segunda etapa do projeto (TCC2). Complementa [`ARQUITETURA.md`](/docs/ARQUITETURA.md) (decisões do TCC1) sem substituí-lo.
+> Este documento registra as decisões técnicas, correções e achados empíricos da segunda etapa do projeto (TCC2). Complementa [`DECISOES_TCC_I.md`](DECISOES_TCC_I.md) (decisões do TCC1) sem substituí-lo.
 
 ## 1. Motivação
 
@@ -30,14 +30,14 @@ Com o vazamento corrigido, testes com N=4 (um caso por categoria) revelaram que 
 
 ## 5. Decisão: Classificador de Risco determinístico
 
-Implementado `RiskClassifier` (porta) / `ThresholdRiskClassifier` (adapter), que decide o campo `risco` (BAIXO/MEDIO/ALTO) a partir de regras de limiar sobre as métricas do DSP — independente do LLM.
+Implementado `RiskClassifier` (porta) / `ThresholdRiskClassifier` (adapter), que decide o campo `risco` (BAIXO/MEDIO/ALTO, ou INDETERMINADO quando a qualidade do sinal é insuficiente) a partir de regras de limiar sobre as métricas do DSP — independente do LLM.
 
 **Trava de segurança**: no `EcgService`, o campo `risco` da resposta final é sempre sobrescrito pelo valor do classificador determinístico, mesmo que o LLM eventualmente sugira outro valor no texto gerado. Defesa em profundidade: prompt + validação de schema + override determinístico.
 
 **Calibração dos limiares** (histórico):
 - N=4 (1 por categoria): limiar inicial de SDNN em 90ms, definido empiricamente.
 - N=16 (4 por categoria): esse limiar gerou 0% de acurácia em APB — sinal de generalização precipitada. Recalibrado para 40ms (ponto médio entre o maior valor observado em Normal e o menor valor observado em APB). Resultado: 100% de acurácia em N=16.
-- N=52 (13 por categoria, majoritariamente dados não usados na calibração): 47/52 (90%) de acurácia geral — Normal 100%, APB 100%, AFIB 92%, AFL 69%.
+- N=52 (13 por categoria, incluindo os exames usados na calibração): 47/52 (90,4%) de acurácia geral — Normal 100%, APB 100%, AFIB 92%, AFL 69%.
 
 **Decisão de escopo fechada**: a consequência da recalibração é que APB e AFIB passam a compartilhar classificação MEDIO. Essa equivalência é uma decisão técnica (separabilidade estatística dos dados disponíveis), não uma afirmação de gravidade clínica equivalente entre as duas condições. A hierarquização clínica formal entre elas é responsabilidade do profissional médico e fica registrada como extensão de trabalho futuro, não bloqueante para o escopo desta PoC.
 
@@ -51,6 +51,8 @@ Implementado `RiskClassifier` (porta) / `ThresholdRiskClassifier` (adapter), que
 | MEDIO | 0,862 | 0,962 | 0,909 |
 | ALTO | 0,900 | 0,692 | 0,783 |
 | **Acurácia geral / Macro F1** | | | **0,904 / 0,897** |
+
+> Valores com o limiar de 40 ms, sobre os mesmos dados usados na calibração. O limiar final (55 ms) e a validação externa estão na seção 16.
 
 O recall mais baixo está na classe ALTO (0,692) — ou seja, o sistema erra mais por **subestimar** risco alto (falso negativo) do que por superestimá-lo. Esse viés é relevante clinicamente e está registrado como ponto de atenção para refinamento futuro.
 
@@ -66,7 +68,7 @@ Implementados 9 testes cobrindo: flatline, saturação do ADC, ruído de alta in
 
 ## 8. Rate Limiting
 
-Adicionado `SlowAPI` (10 requisições/minuto por IP em todas as rotas que chamam a IA), protegendo contra custo financeiro direto de chamadas de LLM em endpoints sem essa proteção. Handler de exceção (`RateLimitExceeded` → HTTP 429) integrado ao padrão já existente de Exception Handlers globais.
+Foi avaliada a limitação de requisições com `SlowAPI` (10 requisições/minuto por IP nas rotas que chamam a IA), para conter o custo das chamadas ao LLM. A funcionalidade não faz parte da versão final descrita no TCC e fica registrada como evolução futura.
 
 ## 9. Testes de qualidade textual (DeepEval)
 
@@ -97,19 +99,24 @@ Adicionados testes complementares aos estruturais: `HallucinationMetric` (fideli
 
 **Nota comparativa entre provedores**: ao avaliar um segundo provedor de LLM (ver seção 12), constatou-se que a API de Chat Completions da OpenAI suporta logprobs de forma nativa e documentada (`logprobs=True`, `top_logprobs=N`) na maioria dos modelos GPT, ao contrário da Gemini API pública. A API de Mensagens da Anthropic (Claude), por sua vez, não expõe suporte nativo a logprobs em sua documentação oficial no momento da escrita.
 
-## 12. Segundo provedor de LLM (em avaliação)
+## 12. Segundo provedor de LLM
 
-Registrado como extensão em andamento: implementação de um segundo `LLMProvider` (candidatos avaliados: OpenAI, Claude), aproveitando o Strategy Pattern já existente (`AIFactory`), com dois objetivos — (a) validar empiricamente o desacoplamento arquitetural já defendido desde o TCC1, e (b) permitir comparação direta de comportamento entre provedores sobre o mesmo conjunto de dados de validação.
+Implementado o `OpenAIProvider` (`gpt-4o-mini`) como segundo `LLMProvider` (candidatos avaliados: OpenAI, Claude), aproveitando o Strategy Pattern já existente (`AIFactory`), com dois objetivos — (a) validar empiricamente o desacoplamento arquitetural já defendido desde o TCC1, e (b) permitir comparação direta de comportamento entre provedores sobre o mesmo conjunto de dados de validação.
 
 ## 13. Limitações conhecidas e trabalho futuro (consolidado)
 
-- Validação estatística formal (sensibilidade/especificidade com significância) contra dataset anotado em maior escala (MIT-BIH/PTB-XL) permanece pendente.
-- Hierarquização clínica formal de severidade entre condições (particularmente APB vs. AFIB) depende de revisão por profissional médico.
-- Refinamento do classificador de risco para capturar apresentações mistas de frequência e variabilidade (achado da seção 5) é candidato a evolução futura (ex: classificador multivariado).
-- Validação com conjunto de dados totalmente independente do conjunto de calibração ainda não foi realizada em escala.
-- ✅ Confiança via logprobs — inativa no Gemini (limitação de plataforma, seção 11), porém **ativa e funcional na OpenAI** (seção 14), confirmando que a limitação era de plataforma, não de conceito.
-- ✅ Tempo de processamento por exame — implementado (seção 15).
-- Comparação sistemática entre provedores (N=52, não apenas N=1) ainda não realizada — necessária antes de qualquer conclusão sobre qual provedor é mais confiável em escala.
+> Lista atualizada ao final do TCC II. A versão completa está no Capítulo 5 do TCC.
+
+- ✅ Validação em base pública externa (PTB-XL) com separação entre treino e teste — realizada (seção 16).
+- ✅ Segundo provedor de LLM (OpenAI) — implementado (seções 12 e 14).
+- ✅ Confiança via logprobs — inativa no Gemini (limitação de plataforma, seção 11), funcional na OpenAI.
+- Tempo de processamento: instrumentado (seção 15), mas não medido de forma sistemática.
+- A ordem fixa das regras classifica fibrilações atriais e extrassístoles com frequência fora da faixa como risco ALTO (15 dos 19 erros no teste final). Candidato: regras combinadas ou árvore de decisão.
+- O SDNN em janelas de 10 s é instável; candidatos: RMSSD, medidas baseadas na mediana e agregação de várias janelas.
+- Filtro de interferência configurado para 50 Hz (rede brasileira: 60 Hz).
+- Comparação entre provedores com N=1; reprodutibilidade entre execuções não avaliada.
+- Validador factual do laudo e comparação com um relatório gerado por template, sem LLM.
+- Avaliação dos laudos por especialistas, interface e alertas.
 
 ## 14. Comparação entre provedores (Gemini vs. OpenAI) — primeira rodada
 
@@ -118,3 +125,29 @@ Registrado em detalhe em `Comparativo_Gemini_OpenAI_AFIB.md`. Resumo: com o mesm
 ## 15. Medição de tempo de processamento
 
 Adicionada instrumentação de tempo total de processamento (`time.perf_counter()`) no `EcgService`, cobrindo do início da validação/conversão do sinal até o retorno do laudo da IA (DSP + classificação de risco + chamada ao LLM). Resultado exposto no campo `tempo_processamento_ms` da resposta. Item solicitado explicitamente por ambos os avaliadores da MoCITeC, pendente desde a rodada de validação quantitativa inicial (seção 5).
+
+## 16. Validação externa e recalibração (PTB-XL)
+
+**Validação externa:** o DSP e o classificador, com o limiar de 40 ms inalterado, foram aplicados a 80 exames do subconjunto 10 da PTB-XL (25 por padrão; apenas 5 *flutters* disponíveis), derivação II, 500 Hz. A acurácia caiu para **66,2%** (F1 macro 0,571), com a queda concentrada nos ritmos normais: no PTB-XL, a mediana do SDNN dos normais foi de 48,9 ms, contra 21,6 a 38,2 ms no IF4Health. O limiar de 40 ms estava ajustado à faixa estreita dos poucos normais da calibração.
+
+**Recalibração:** o limiar de SDNN foi escolhido em 346 exames dos subconjuntos 1 a 8 (100 por padrão e os 46 *flutters*), testando valores de 30 a 150 ms em passos de 5 ms. O maior F1 macro foi em **55 ms** (0,772), adotado na versão final.
+
+**Teste final:** como o subconjunto 10 já havia sido inspecionado, o limiar de 55 ms foi avaliado uma única vez no subconjunto 9, nunca examinado antes.
+
+| Conjunto | Limiar | Acurácia | F1 macro |
+|---|---|---|---|
+| IF4Health (calibração) | 40 ms | 90,4% | 0,897 |
+| PTB-XL f10 | 40 ms | 66,2% | 0,571 |
+| PTB-XL f10 | 55 ms | 72,5% | 0,643 |
+| IF4Health | 55 ms | 86,5% | 0,860 |
+| **PTB-XL f9 (teste final)** | **55 ms** | **76,2%** | **0,699** |
+
+Scripts e relatórios na pasta `validacao/`.
+
+## 17. Execução final dos testes de qualidade textual
+
+Com o critério de morfologia revisado (seção 9), os quatro laudos (um por padrão) foram aprovados nas duas métricas do DeepEval, com nota 1,00, em uma única execução. Ressalvas: amostra de quatro laudos, métrica de alucinação binária na prática (um contexto por laudo) e avaliador do mesmo provedor do gerador.
+
+## 18. Achado: extrapolação de linguagem no laudo
+
+No laudo de comparação (seção 14), o Gemini descreveu o limiar de 40 ms como "limiar de referência **clínico**", qualificação que não constava nas informações fornecidas, já que o limiar foi calibrado nos dados. Os números e o risco permaneceram corretos, garantidos pela trava determinística. O caso mostra que as diretrizes do prompt reduzem, mas não eliminam, afirmações sem sustentação, e motiva o validador factual listado como trabalho futuro.

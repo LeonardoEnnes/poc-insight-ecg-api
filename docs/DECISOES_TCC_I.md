@@ -1,6 +1,9 @@
 
-# DECISOES DO TCC I
-Aqui fica todas as decisões feitas no desenvolvimento do TCC I
+# DECISÕES DO TCC I
+Registro das decisões tomadas na primeira etapa do projeto (TCC I).
+
+> [!NOTE]
+> Este documento é um **registro histórico**. Na versão final (TCC II), o LLM deixou de receber o sinal bruto: o processamento de sinal e a classificação de risco passaram a componentes determinísticos, e o fatiamento clínico mudou de função. Veja [DECISOES_TCC_II.md](DECISOES_TCC_II.md).
 
 # Decisões Arquiteturais
 
@@ -48,4 +51,6 @@ Os modelos LLM sofrem de perda de contexto quando tem janelas massivas de inform
 Foi implementada uma trava de segurança (`MAX_SIGNAL_POINTS = 30000`), correspondendo a uma janela de **1 minuto** de exame de repouso (considerando taxas de amostragem de até 500Hz). 
 
 **Justificativa Técnica:**
-60 segundos permite que a IA analise a variabilidade da frequência cardíaca e identifique padrões morfológicos intermitentes, sem comprometer a latência ou exceder os limites de tokens do modelo atual. Atualmente para a POC manti 1 minuto mas futuramente avaliar a viabilidade de aumentar
+60 segundos permitiam que a IA analisasse a variabilidade da frequência cardíaca sem comprometer a latência ou exceder os limites de tokens do modelo.
+
+**Atualização (TCC II):** como o LLM passou a receber apenas as métricas, o limite de 30.000 pontos deixou de proteger a janela de contexto e passou a controlar o custo computacional do processamento e o tempo de resposta. Como é expresso em pontos, a duração analisada depende da taxa de amostragem: cerca de 83 s a 360 Hz, 1 min a 500 Hz e 2 min a 250 Hz.
