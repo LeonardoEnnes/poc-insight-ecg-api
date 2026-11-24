@@ -6,60 +6,57 @@
 [![CI](https://github.com/LeonardoEnnes/poc-insight-ecg-api/actions/workflows/ci.yml/badge.svg)](https://github.com/LeonardoEnnes/poc-insight-ecg-api/actions/workflows/ci.yml)
 
 > [!IMPORTANT]
-> POC finalizada
+> POC finalizada. Código correspondente ao TCC *Insight-ECG: Síntese de Laudos Clínicos para Ecossistemas Interoperáveis utilizando Processamento de Linguagem Natural* (IFSul — Tecnologia em Sistemas para Internet).
 
 ## Sumário
 - [Visão Geral](#visão-geral)
 - [Fluxo do Sistema](#fluxo-do-sistema)
 - [Arquitetura e Tecnologias](#arquitetura-e-tecnologias)
 - [Como Executar Localmente](#como-executar-localmente)
-  - [Pré-requisitos](#pré-requisitos)
-  - [Subindo o Ambiente](#subindo-o-ambiente)
 - [Como rodar os Testes](#como-rodar-os-testes)
-- [Rotas disponiveis](#rotas-disponiveis)
+- [Rotas disponíveis](#rotas-disponíveis)
+- [Validação do Classificador de Risco](#validação-do-classificador-de-risco)
 - [Estrutura de pastas](#estrutura-de-pastas)
 - [Arquitetura do Sistema](#arquitetura-do-sistema)
 - [Documentação Aprofundada](#documentação-aprofundada)
 
 ## Visão Geral
 
-O **Insight-ECG** é uma Prova de Conceito (POC) projetada para atuar como a camada de inteligência do ecossistema **IF4Health**, na leitura de ECGs e síntese de laudos clínicos preliminares, com classificação de risco e alertas.
+O **Insight-ECG** é um *middleware* de apoio à decisão clínica integrado ao ecossistema **IF4Health**. Ele recebe exames de ECG no padrão HL7 FHIR, extrai métricas de ritmo, classifica o nível de risco e gera um laudo textual preliminar.
 
-O sistema combina processamento determinístico de sinal (DSP) e classificação de risco baseada em regras com um LLM, que atua exclusivamente como narrador — comunicando em linguagem clínica uma síntese já fundamentada matematicamente, nunca decidindo sozinho a interpretação do sinal ou o nível de risco.
+O sistema combina processamento determinístico de sinal (DSP) e classificação de risco baseada em regras com um LLM, que atua exclusivamente como **redator**: comunica em linguagem clínica um resultado já calculado e decidido por código, sem decidir a interpretação do sinal nem o nível de risco.
+
+> [!NOTE]
+> O sistema é uma ferramenta de apoio à priorização de exames. Ele analisa uma única derivação e apenas o ritmo (frequência cardíaca e variabilidade RR), não emite diagnóstico e não foi validado clinicamente.
 
 ## Fluxo do Sistema
 
-O funcionamento do **Insight-ECG** segue um pipeline linear e resiliente:
-
-1.  **Entrada (Ingestão)**: O sistema recebe um identificador de exame (`observation_id`) ou um payload JSON manual no padrão HL7 FHIR.
-2.  **Integração e Coleta**: Caso seja uma integração, o `IFCloudClient` realiza uma chamada autenticada ao servidor do IF-Cloud para extrair os biossinais brutos.
-3.  **Validação e Conversão**: O `EcgService` valida a integridade do sinal via Pydantic e aplica a conversão de unidade do sinal (`factor`/`origin` do FHIR `SampledData`).
-4.  **Fatiamento Clínico**: Aplicação de um fatiamento (*sliding window*) de até 30.000 pontos, garantindo uma janela de contexto de aproximadamente 1 minuto de exame.
-5.  **Extração Determinística de Features (DSP)**: O `SignalProcessor` (`NeuroKitSignalProcessor`) calcula frequência cardíaca (HR) e variabilidade RR (SDNN) a partir do sinal.
-6.  **Classificação de Risco Determinística**: O `RiskClassifier` (`ThresholdRiskClassifier`) decide o nível de risco (BAIXO/MEDIO/ALTO) a partir das métricas extraídas.
-7.  **Narrativa por IA (Inferência)**: As métricas e a decisão de risco são injetadas em um prompt estruturado com *guardrails* clínicos e enviadas ao Google Gemini através do `GeminiProvider`, cuja função é comunicar o resultado em linguagem clínica.
-8.  **Saída (Entrega)**: O sistema devolve um laudo técnico estruturado em JSON, com o campo de risco sempre correspondente à decisão do classificador determinístico.
+1. **Entrada**: o sistema recebe um recurso FHIR `Observation` no corpo da requisição ou o identificador de um exame armazenado no IF-Cloud.
+2. **Integração**: nas rotas de integração, o `IFCloudClient` busca o exame no IF-Cloud usando o token do usuário.
+3. **Validação e conversão**: o Pydantic valida o contrato FHIR, e cada valor do sinal é convertido por `valor × factor + origin`; a taxa de amostragem é calculada como `1000 / period`.
+4. **Fatiamento clínico**: exames com mais de 30.000 pontos têm apenas o trecho inicial analisado (cerca de 83 s a 360 Hz, 1 min a 500 Hz), e a análise é marcada como `PARCIAL`.
+5. **Extração de métricas (DSP)**: o `NeuroKitSignalProcessor` calcula a frequência cardíaca média e o SDNN, e verifica a qualidade da detecção (sinais sem batimentos reais são marcados como `INSUFICIENTE`).
+6. **Classificação de risco**: o `ThresholdRiskClassifier` decide o risco (`BAIXO`, `MEDIO`, `ALTO` ou `INDETERMINADO`) e gera um **padrão sugerido** com as ressalvas de incerteza.
+7. **Redação do laudo**: as métricas, o risco e o padrão sugerido são enviados ao LLM (Gemini ou OpenAI) com *guardrails* no *prompt*.
+8. **Trava determinística**: o `EcgService` sobrescreve os campos `risco` e `padrao_sugerido` com os valores do classificador e devolve o laudo em JSON, com o tempo de processamento.
 
 ## Arquitetura e Tecnologias
 
-* **Framework:** [FastAPI](https://fastapi.tiangolo.com/) (Framework web assíncrono e de alta performance).
-* **Validação de Dados:** [Pydantic](https://docs.pydantic.dev/) (Validação estrita de *schemas* FHIR e de saída do LLM).
-* **Processamento de Sinal:** [NeuroKit2](https://neuropsychology.github.io/NeuroKit/) (extração determinística de frequência cardíaca e variabilidade RR).
-* **Integração de IA:** [Google Gen AI SDK](https://pypi.org/project/google-genai/). (No momento somente o Gemini por questão de disponibilidade da chave de API).
-* **Rate Limiting:** [SlowAPI](https://github.com/laurentS/slowapi).
-* **Testes de Qualidade de LLM:** [DeepEval](https://github.com/confident-ai/deepeval) (métricas de alucinação e fidelidade textual via LLM-as-judge).
-* **Infraestrutura:** Docker & Docker Compose para um *deploy* contínuo e sem atritos.
+* **Framework:** [FastAPI](https://fastapi.tiangolo.com/)
+* **Validação de Dados:** [Pydantic](https://docs.pydantic.dev/) (contrato FHIR na entrada e *schema* do laudo na saída)
+* **Processamento de Sinal:** [NeuroKit2](https://neuropsychology.github.io/NeuroKit/) 0.2.10
+* **Provedores de LLM:** [Google Gen AI SDK](https://pypi.org/project/google-genai/) (Gemini, padrão) e [OpenAI SDK](https://pypi.org/project/openai/) (`gpt-4o-mini`), selecionados pela variável `AI_PROVIDER`
+* **Testes:** pytest e [DeepEval](https://github.com/confident-ai/deepeval) (qualidade textual via LLM-as-a-judge)
+* **Infraestrutura:** Docker e Docker Compose
 
 > [!WARNING]
-> Nomes de modelo de LLM (tanto o provedor de produção quanto o modelo usado como avaliador em `tests/quality/`) mudam com frequência e podem ser descontinuados sem aviso prévio no código. Se a API retornar erro 404 mencionando "no longer available", a própria mensagem de erro costuma indicar o modelo de substituição recomendado - consulte `AI_MODEL_NAME` no `.env` e o `model_name` em `tests/quality/gemini_judge_model.py`.
+> Nomes de modelo de LLM mudam com frequência e podem ser descontinuados sem aviso. Se a API retornar erro 404 mencionando "no longer available", confira `AI_MODEL_NAME` no `.env` e o `model_name` em `tests/quality/gemini_judge_model.py`.
 
 ## Como Executar Localmente
 
-Este projeto é totalmente conteinerizado. Você não precisa instalar dependências Python localmente para rodar a API.
-
 ### Pré-requisitos
 * [Docker Desktop](https://www.docker.com/products/docker-desktop/) instalado e em execução.
-* Integração com WSL 2 ativada (se estiver rodando no Windows).
+* Integração com WSL 2 ativada (se estiver no Windows).
 
 ### Subindo o Ambiente
 
@@ -69,224 +66,182 @@ Este projeto é totalmente conteinerizado. Você não precisa instalar dependên
    cd poc-insight-ecg-api
    ```
 
-2. Inicie a aplicação usando o Docker Compose:
+2. Configure as variáveis de ambiente:
+   ```bash
+   cp .env.example .env
+   ```
+   Edite o `.env` com a sua chave:
+   ```bash
+   AI_PROVIDER=gemini
+   AI_API_KEY=COLE_SUA_CHAVE_AQUI
+   # Confira o nome atual do modelo na documentação do provedor
+   AI_MODEL_NAME=gemini-3.8-flash
+   ```
+   A chave do Gemini é gerada no [Google AI Studio](https://aistudio.google.com/app/api-keys). Para usar a OpenAI, defina `AI_PROVIDER=openai`, `OPENAI_API_KEY` e `OPENAI_MODEL_NAME`.
 
-    ```bash
-    docker compose up --build
-    ```
+3. Suba a aplicação:
+   ```bash
+   docker compose up --build
+   ```
 
-3. Variaveis de ambiente:
-    - Obtendo a chave do **Gemini**: (no momento o gemini é o unico aceito no sistema)
-        - Acesse o [Google AI Studio](https://aistudio.google.com/app/api-keys).
-        - Clique em **Create API Key**
-        - Copie o valor gerado
-    - Na raiz do projeto, copie e cole no terminal:
-    ```bash
-    cp .env.example .env
-    ```
-    - Edite o arquivo .env e cole suas credenciais
-        ```bash 
-        AI_API_KEY="COLE_SUA_CHAVE_AQUI" # Gemini, openai etc 
-        AI_MODEL_NAME="gemini-3.6-flash" # SEMPRE confira o nome atual do modelo na doc oficial do provedor - nomes de modelo são descontinuados com frequência
-        ```
- 
-4. Acesse a API e a documentação:
+4. Acesse:
+   - Health Check: http://localhost:8000/health
+   - Swagger UI: http://localhost:8000/docs
 
-    - Health Check: http://localhost:8000/health
+## Como rodar os Testes
 
-    - Swagger UI: http://localhost:8000/docs
-
-### Como rodar os Testes
-
-Com a aplicação rodando (`docker compose up`) em outro terminal, rode a suíte principal (rápida, sem custo de API - usa mocks para o LLM):
+Suíte principal (29 testes, usa provedores de IA simulados, sem custo):
 ```bash
 docker exec -it poc-api pytest -v --ignore=tests/quality
 ```
 
-Caso precise da cobertura de testes:
+Com cobertura:
 ```bash
 docker exec -it poc-api pytest --cov=app --cov-report=html --ignore=tests/quality
 ```
 
 > [!IMPORTANT]
-> Os testes em `tests/quality/` (DeepEval) fazem chamadas **reais** à API do Gemini e **não são gratuitos nem instantâneos**. A cota gratuita da API é de poucas requisições por dia por modelo - rodar essa suíte junto com o restante pode facilmente estourar a cota (erro 429). Rode-a isoladamente e com moderação:
+> Os testes em `tests/quality/` (DeepEval, 8 testes) fazem chamadas **reais** à API do Gemini e consomem a cota gratuita, que é de poucas requisições por dia. Por isso, eles não rodam na CI e devem ser executados isoladamente:
 > ```bash
 > docker exec -it poc-api pytest tests/quality/ -v -s
 > ```
 
----
-### Rotas disponiveis
+## Rotas disponíveis
 
-#### Rota 1: Processamento Manual
-- **POST** `/api/v1/ecg/process`
-- **Descrição**: Recebe um payload FHIR completo via body da requisição.
-- **Uso**: Integrações diretas que já possuem o dado em mãos.
-- **Rate limit**: 10 requisições/minuto por IP.
+Todas as rotas ficam sob o prefixo `/api/v1/ecg`.
 
-#### Rota 2: Processamento por Minuto (IF-Cloud)
-- **GET** `/api/v1/ecg/process/if-cloud/{observation_id}?minute=0`
-- **Descrição**: Busca 1 minuto específico de sinal no IF-Cloud e gera o laudo.
-- **Rate limit**: 10 requisições/minuto por IP.
+| Método | Rota | Parâmetros | Uso |
+|---|---|---|---|
+| POST | `/process` | Recurso FHIR no corpo | Exame enviado diretamente |
+| GET | `/process/if-cloud/{observation_id}` | `minute` | Analisar um minuto específico do exame no IF-Cloud |
+| GET | `/process/if-cloud/{observation_id}/range` | `start`, `end` | Analisar um intervalo de pontos |
+| GET | `/process/if-cloud/{observation_id}/full` | — | Analisar o exame inteiro, sujeito ao fatiamento clínico |
 
-#### Rota 3: Processamento por Intervalo (Range)
-- **GET** `/api/v1/ecg/process/if-cloud/{observation_id}/range?start=0&end=5`
-- **Descrição**: Busca um intervalo de pontos (start/end) no IF-Cloud. Ideal para fatiamentos cirúrgicos.
-- **Rate limit**: 10 requisições/minuto por IP.
+As rotas do IF-Cloud exigem o token de acesso do usuário no cabeçalho `Authorization: Bearer`. Consulte o [guia de integração com o IF-Cloud](docs/INTEGRACAO_IFCLOUD.md).
 
-#### Rota 4: Processamento Completo (Metadados)
-- **GET** `/api/v1/ecg/process/if-cloud/{observation_id}/full`
-- **Descrição**: Busca o recurso Observation completo. Útil para extrair metadados e o sinal total disponível.
-- **Rate limit**: 10 requisições/minuto por IP.
+## Validação do Classificador de Risco
 
-Consulte o [Guia de uso das rotas](/docs/INTEGRACAO_IFCLOUD.md) para conseguir usar as rotas com sucesso.
+A pasta `validacao/` reúne os scripts que avaliam o processamento de sinal e o classificador **sem chamar o LLM** (gratuitos e reprodutíveis):
+
+| Script | O que faz |
+|---|---|
+| `validar_em_lote.py` | Avalia os 52 exames do IF4Health (`tests/fixtures/ecgs_raw`) |
+| `validar_ptbxl.py` | Avalia exames da base pública [PTB-XL](https://physionet.org/content/ptb-xl/) (derivação II, 500 Hz) |
+| `calibrar_ptbxl.py` | Escolhe o limiar de SDNN nos subconjuntos 1 a 8 da PTB-XL pelo maior F1 macro |
+
+```bash
+docker exec -it poc-api python validacao/validar_em_lote.py tests/fixtures/ecgs_raw
+docker exec -it poc-api python validacao/validar_ptbxl.py --n 25 --folds 9
+docker exec -it poc-api python validacao/calibrar_ptbxl.py
+```
+
+Os relatórios de cada etapa ficam em `validacao/resultados/`. Resumo dos resultados com o limiar final de SDNN (55 ms):
+
+| Conjunto | Acurácia | F1 macro |
+|---|---|---|
+| PTB-XL, subconjunto 9 (teste final, nunca usado no desenvolvimento) | 76,2% | 0,699 |
+| PTB-XL, subconjunto 10 | 72,5% | 0,643 |
+| IF4Health (52 exames) | 86,5% | 0,860 |
+
+> [!NOTE]
+> O risco esperado de cada padrão (BAIXO para ritmo normal, MEDIO para extrassístole e fibrilação atrial, ALTO para *flutter*) é uma decisão técnica do projeto, não uma classificação clínica validada. Detalhes em [`docs/DECISOES_TCC_II.md`](docs/DECISOES_TCC_II.md).
 
 ## Estrutura de pastas
-O projeto segue os princípios da **Arquitetura Hexagonal (Ports & Adapters)**, promovendo o desacoplamento entre a regra de negócio e os serviços de infraestrutura (APIs externas, IA, processamento de sinal).
+
+O projeto segue a **Arquitetura Hexagonal (Ports & Adapters)**: o núcleo depende apenas de interfaces (portas), implementadas por adaptadores substituíveis.
+
 ```text
 ├── app/
-│   ├── core/               # Configurações globais, exceções, portas (interfaces),
-│   │                       # rate limiter e prompts de IA
+│   ├── core/                     # Configurações, exceções, portas e prompts
 │   │   ├── config.py
 │   │   ├── exceptions.py
 │   │   ├── exceptions_handler.py
-│   │   ├── limiter.py            # Configuração do SlowAPI
 │   │   ├── prompts.py
-│   │   ├── risk_classifier.py    # Porta: interface do classificador de risco
-│   │   └── signal_processor.py   # Porta: interface do processador de sinal
-│   ├── infrastructure/     # Adaptadores externos (implementações concretas)
+│   │   ├── risk_classifier.py    # Porta: classificador de risco
+│   │   └── signal_processor.py   # Porta: processador de sinal
+│   ├── infrastructure/           # Adaptadores
 │   │   ├── classification/
-│   │   │   └── threshold_risk_classifier.py  # Adapter: classificador por limiar
+│   │   │   └── threshold_risk_classifier.py
 │   │   ├── ia/
-│   │   │   ├── base.py
-│   │   │   ├── factory.py
-│   │   │   └── gemini.py         # Adapter: GeminiProvider
+│   │   │   ├── base.py           # Porta: LLMProvider
+│   │   │   ├── factory.py        # AIFactory
+│   │   │   ├── gemini.py         # GeminiProvider
+│   │   │   └── openai_provider.py
 │   │   ├── signal/
-│   │   │   └── neurokit_processor.py  # Adapter: extração via NeuroKit2
+│   │   │   └── neurokit_processor.py
 │   │   └── if_cloud_client.py
-│   ├── routes/             # Endpoints de entrada HTTP (FastAPI Routers)
-│   ├── schemas/            # Contratos de validação estrita Pydantic (Ex: FHIRObservation)
-│   ├── services/           # Coração da regra de negócio (EcgService) e orquestração
-│   └── main.py             # Entrypoint da aplicação e injeção de Exception Handlers
+│   ├── routes/                   # Rotas HTTP (FastAPI)
+│   ├── schemas/                  # Contrato FHIR (Pydantic)
+│   ├── services/                 # EcgService (orquestração)
+│   └── main.py
 ├── tests/
-│   ├── fixtures/
-│   │   ├── ecgs_raw/       # Sinais brutos por categoria clínica (normal/apb/afl/afib)
-│   │   └── payloads/       # Payloads FHIR prontos por categoria
-│   ├── infrastructure/     # Testes de DSP, adversariais, e cliente IF-Cloud
-│   ├── quality/            # Testes de qualidade textual do LLM (DeepEval)
-│   ├── router/             # Testes de integração das rotas HTTP
-│   └── service/            # Testes do EcgService
-├── docs/                   # Decisões arquiteturais e documentação aprofundada
-├── .env.example            # Template seguro de variáveis de ambiente
-├── docker-compose.yml      # Orquestração do ambiente local
-├── Dockerfile              # Imagem de produção/desenvolvimento
-├── pytest.ini              # Configuração de mapeamento do ambiente de testes
-└── requirements.txt        # Dependências do projeto fixadas
+│   ├── fixtures/                 # Sinais e payloads FHIR por padrão (normal/apb/afl/afib)
+│   ├── infrastructure/           # DSP, testes adversariais e cliente IF-Cloud
+│   ├── quality/                  # DeepEval (chamadas reais, fora da CI)
+│   ├── router/                   # Rotas HTTP
+│   └── service/                  # EcgService
+├── validacao/                    # Scripts de validação do classificador e resultados
+├── docs/                         # Decisões técnicas e guias
+├── .env.example
+├── docker-compose.yml
+├── Dockerfile
+├── pytest.ini
+└── requirements.txt
 ```
-
 
 ## Arquitetura do Sistema
 
-O **Insight-ECG** isola a regra de negócio das integrações externas e das decisões clínicas. A camada de IA generativa atua estritamente como comunicadora de uma síntese já fundamentada por processamento determinístico.
-
-
 ```mermaid
 flowchart TD
-    %% Atores / Clientes
     USER([Cliente / Swagger UI])
-    
-    %% Ecossistema da API
+
     subgraph "Insight-ECG API (FastAPI / Docker)"
-        
-        ROUTER["Rotas (ecg_router.py)\n+ Rate Limiting (SlowAPI)"]
-        EXC_HANDLER["Global Exception Handlers"]
-        SCHEMAS["Validador Pydantic (FHIR Schema)\n+ Conversão factor/origin"]
-        SERVICE["EcgService (Core / Orquestração)"]
-        
-        subgraph "Camadas Determinísticas (Core)"
-            DSP["SignalProcessor\n(NeuroKitSignalProcessor)\nHR + SDNN"]
-            RISK["RiskClassifier\n(ThresholdRiskClassifier)\nBAIXO / MEDIO / ALTO"]
+        ROUTER["Rotas (ecg_router.py)"]
+        EXC_HANDLER["Exception Handlers globais"]
+        SCHEMAS["Validação Pydantic (FHIR)\n+ conversão factor/origin"]
+        SERVICE["EcgService\n(fatiamento + orquestração + trava)"]
+
+        subgraph "Componentes determinísticos"
+            DSP["NeuroKitSignalProcessor\nFC + SDNN + qualidade"]
+            RISK["ThresholdRiskClassifier\nrisco + padrão sugerido"]
         end
-        
-        subgraph "Infraestrutura (Adapters)"
-            IF_CLIENT["IFCloudClient (HTTPX)"]
-            IA_FACTORY["AIFactory (Dependency Injection)"]
-            GEMINI_PROV["GeminiProvider (GenAI SDK)\napenas narrativa"]
+
+        subgraph "Adaptadores de saída"
+            IF_CLIENT["IFCloudClient"]
+            IA_FACTORY["AIFactory"]
+            PROVIDERS["GeminiProvider / OpenAIProvider\napenas redação"]
         end
     end
-    
-    %% Ecossistema Externo
-    subgraph "Sistemas Externos"
-        IF_CLOUD[("IF-Cloud Biofass\n(Servidor FHIR)")]
-        GEMINI_API[("Google Gemini\n(LLM API)")]
+
+    subgraph "Sistemas externos"
+        IF_CLOUD[("IF-Cloud\n(servidor FHIR)")]
+        LLM_API[("API do LLM")]
     end
 
-    %% Fluxos de Comunicação
-    USER -- "POST /api/v1/ecg/process" --> ROUTER
-    
-    ROUTER -- "1. Injeta Integrações" --> IF_CLIENT
-    ROUTER -- "2. Valida Contrato" --> SCHEMAS
-    
-    SCHEMAS -- "3. Payload Convertido" --> SERVICE
-    SERVICE -- "4. Extrai Features" --> DSP
-    DSP -- "5. Métricas (HR/SDNN)" --> RISK
-    RISK -- "6. Risco já decidido\n+ justificativa" --> IA_FACTORY
-    IA_FACTORY -- "7. Instancia" --> GEMINI_PROV
-    
-    %% Chamadas de Rede
-    IF_CLIENT <== "Busca Observation" ==> IF_CLOUD
-    GEMINI_PROV <== "Recebe métricas + risco\nRetorna JSON narrativo" ==> GEMINI_API
-    
-    %% Fluxo de Erro
-    SERVICE -. "Lança Exceções (Ex: Limite Excedido, Qualidade Insuficiente)" .-> EXC_HANDLER
-    GEMINI_PROV -. "Lança Exceções (Ex: Timeout)" .-> EXC_HANDLER
-    ROUTER -. "Rate Limit Excedido (429)" .-> EXC_HANDLER
-    EXC_HANDLER -. "Retorna HTTP 4xx/5xx limpo" .-> USER
+    USER -- "POST /process ou GET /process/if-cloud/..." --> ROUTER
+    ROUTER -- "busca o exame" --> IF_CLIENT
+    IF_CLIENT <== "Observation" ==> IF_CLOUD
+    ROUTER --> SCHEMAS --> SERVICE
+    SERVICE --> DSP --> RISK
+    RISK -- "risco já decidido" --> IA_FACTORY --> PROVIDERS
+    PROVIDERS <== "métricas + risco / laudo JSON" ==> LLM_API
+    PROVIDERS -- "laudo" --> SERVICE
 
-    %% Estilização para o GitHub
+    SERVICE -. "Sinal corrompido (422)" .-> EXC_HANDLER
+    SCHEMAS -. "Contrato FHIR inválido (422)" .-> EXC_HANDLER
+    PROVIDERS -. "Falha do provedor (502)" .-> EXC_HANDLER
+    EXC_HANDLER -. "resposta HTTP padronizada" .-> USER
+
     style SERVICE fill:#2b3137,stroke:#2ea043,stroke-width:2px,color:#fff
     style DSP fill:#2b3137,stroke:#d29922,stroke-width:2px,color:#fff
     style RISK fill:#2b3137,stroke:#d29922,stroke-width:2px,color:#fff
-    style GEMINI_API fill:#005ce6,color:#fff
+    style LLM_API fill:#005ce6,color:#fff
     style IF_CLOUD fill:#005ce6,color:#fff
 ```
----
 
-## Validação em Lote do Classificador de Risco
- 
-O repositório inclui `scripts/validar_em_lote.py`, uma ferramenta de validação que roda a camada de DSP (`NeuroKit2`) e o `ThresholdRiskClassifier` sobre um conjunto de arquivos de ECG organizados por categoria clínica, sem envolver o LLM.
- 
-**Para que serve**: os limiares do `ThresholdRiskClassifier` (`HR_BRADICARDIA_BPM`, `HR_TAQUICARDIA_BPM`, `HRV_SDNN_ELEVADO_MS`) são calibrados empiricamente a partir de dados reais, não de valores clínicos publicados prontos. Esse script permite recalibrar e revalidar esses limiares sempre que novos arquivos de referência forem incorporados, sem precisar rodar cada caso manualmente pelo Swagger (que exige uma chamada real e paga ao Gemini por arquivo). Como não chama LLM, é gratuito e roda em segundos mesmo para dezenas de arquivos.
- 
-**Como usar**: organize os arquivos `.txt` de sinal bruto em subpastas por categoria clínica, dentro de uma pasta raiz:
-```
-dados_validacao/
-    normal/
-        arquivo1.txt
-        arquivo2.txt
-    apb/
-        arquivo1.txt
-    afl/
-        ...
-    afib/
-        ...
-```
- 
-Rode:
-```bash
-docker exec -it poc-api python scripts/validar_em_lote.py tests/fixtures/ecgs_raw
-```
- 
-O script gera:
-- `relatorio_completo.csv` — uma linha por arquivo processado, com HR, HRV, risco obtido vs. esperado e indicador de acerto.
-- Um resumo agregado no console, com média e desvio padrão de HR/HRV por categoria e a acurácia do classificador.
-> [!NOTE]
-> O mapeamento `RISCO_ESPERADO_POR_CATEGORIA` dentro do script reflete uma decisão de calibração técnica (ver `docs/DECISOES_TCC2.md`), não uma afirmação de gravidade clínica validada — ajuste-o conforme critério clínico se necessário antes de interpretar a acurácia reportada.
+## Documentação Aprofundada
 
-### Documentação Aprofundada
-As decisões técnicas, possiveis soluções, padrões de projeto e justificações arquiteturais estão documentadas no diretório docs/.
-
-Acesse por aqui:
-- [Decisões Arquiteturais](/docs/DECISOES_TCC_II)
-- [Decisoes Feitar para o TCC 2](/docs/DECISOES_TCC_II)
-- [Integração com o IfCloud]()
-- Caso encontre problemas consulte: [TroubleShootings - Possiveis soluções de erros](./docs/TROUBLESHOOTING.md)
+- [Decisões do TCC I](docs/DECISOES_TCC_I.md): arquitetura hexagonal, padrões de projeto e decisões da primeira etapa
+- [Decisões do TCC II](docs/DECISOES_TCC_II.md): DSP, classificador de risco, validação externa e achados
+- [Integração com o IF-Cloud](docs/INTEGRACAO_IFCLOUD.md): autenticação e uso das rotas de integração
+- [Troubleshooting](docs/TROUBLESHOOTING.md): erros comuns e soluções
