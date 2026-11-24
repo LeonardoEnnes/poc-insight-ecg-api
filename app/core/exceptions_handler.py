@@ -1,6 +1,7 @@
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from pydantic import ValidationError
+from slowapi.errors import RateLimitExceeded
 from app.core.exceptions import (
     SignalTooLongException, 
     CorruptedSignalException, 
@@ -60,4 +61,11 @@ def add_exception_handlers(app: FastAPI):
         return JSONResponse(
             status_code=exc.status_code,
             content={"error": "Erro na Integração Externa", "detail": exc.message},
+        )
+        
+    @app.exception_handler(RateLimitExceeded)
+    async def rate_limit_handler(request: Request, exc: RateLimitExceeded):
+        return JSONResponse(
+            status_code=429,
+            content={"error": "Limite de Requisições Excedido", "detail": str(exc.detail)},
         )

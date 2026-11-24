@@ -3,9 +3,13 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     ENVIRONMENT: str = "dev"
     AI_PROVIDER: str = "gemini"
-    AI_API_KEY: str = "" 
-    AI_MODEL_NAME: str 
+    AI_API_KEY: str = ""
+    AI_MODEL_NAME: str
     IF_API: str = ""
+
+    # Segundo provedor (OpenAI) - só é obrigatório se AI_PROVIDER="openai"
+    OPENAI_API_KEY: str = ""
+    OPENAI_MODEL_NAME: str = "gpt-4o-mini"
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 

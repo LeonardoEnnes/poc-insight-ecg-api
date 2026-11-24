@@ -24,15 +24,16 @@ class FHIRObservation(BaseModel):
     status: str
     device: Device
     component: List[Component]
-
+    
+    # Metodo para obter os sinais limpos a partir dos dados utilizando o fator e a origem para ajustar os valores brutos e retornar uma lista de valores float
     def get_clean_signal(self) -> list[float]:
-        """
-        Método auxiliar: Pega a string de dados brutos e converte 
-        em uma lista de números decimais para facilitar cálculos matemáticos.
-        """
         raw_string = self.component[0].valueSampledData.data
-        # Divide a string pelos espaços e converte cada pedaço em float
-        return [float(x) for x in raw_string.strip().split()]
+        raw_values = [float(x) for x in raw_string.strip().split()]
+    
+        factor = self.component[0].valueSampledData.factor
+        origin = self.component[0].valueSampledData.origin.value
+    
+        return [(v * factor) + origin for v in raw_values]
 
     def get_period_ms(self) -> float:
         return self.component[0].valueSampledData.period

@@ -1,3 +1,4 @@
+from app.core import limiter
 from fastapi import FastAPI
 from app.core.config import settings
 from app.core.exceptions_handler import add_exception_handlers
@@ -8,6 +9,8 @@ app = FastAPI(
     description="API para analise semantica de ECG via IA generativa",
     version="0.1.0",
     )
+
+app.state.limiter = limiter
 
 app.include_router(ecg_router.router)
 add_exception_handlers(app)
