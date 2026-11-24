@@ -151,4 +151,10 @@ def test_laudo_nao_inventa_morfologia_de_onda(caso):
         threshold=0.7,
         model=judge_model,
     )
-    assert_test(test_case, [metric])
+    metric.measure(test_case)
+    print(f"\n[{caso['nome']}] GEval score={metric.score:.3f} | reason={metric.reason}")
+
+    assert metric.is_successful(), (
+        f"Caso '{caso['nome']}' falhou no critério de morfologia. "
+        f"Score={metric.score:.3f}, razão: {metric.reason}"
+    )
